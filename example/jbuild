@@ -1,0 +1,6 @@
+(executables
+ ((names (command_rpc_example))
+  (libraries (
+    async
+    core
+    command_rpc))))
