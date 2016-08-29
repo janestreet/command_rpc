@@ -78,16 +78,63 @@ module Command = struct
 
   let write_sexp w sexp = Writer.write_sexp w sexp; Writer.newline w
 
-  let main ?log_not_previously_seen_version impls ~show_menu mode =
+  (** This function returns [stdin] and [stdout] as similar to the original [Reader.stdin]
+      and [Writer.stdout] as possible, except they should have new file descriptor numbers
+      (greater than 2) to avoid the other parts of the program writing there by accident.
+
+      It also changes file descriptors such that after this function [Reader.stdin] is
+      reading from /dev/null and [Writer.stdout] is writing to stderr.
+  *)
+  let claim_stdin_and_stdout_for_exclusive_use () =
+    let stdin  = Lazy.force Reader.stdin  in
     let stdout = Lazy.force Writer.stdout in
+    let stderr = Lazy.force Writer.stderr in
+    assert (Int.(=) (Fd.to_int_exn (Reader.fd stdin )) 0);
+    assert (Int.(=) (Fd.to_int_exn (Writer.fd stdout)) 1);
+    assert (Int.(=) (Fd.to_int_exn (Writer.fd stderr)) 2);
+    let module Standard_fd = struct
+      let stdin  = Core.Std.Unix.File_descr.of_int 0
+      let stdout = Core.Std.Unix.File_descr.of_int 1
+      let stderr = Core.Std.Unix.File_descr.of_int 2
+    end
+    in
+    let make_a_copy_of_stdin_and_stdout () =
+      let dupped_stdin  = Core.Std.Unix.dup Standard_fd.stdin  in
+      let dupped_stdout = Core.Std.Unix.dup Standard_fd.stdout in
+      assert (Core.Std.Unix.File_descr.to_int dupped_stdin  > 2);
+      assert (Core.Std.Unix.File_descr.to_int dupped_stdout > 2);
+      let create_fd ~similar_to fd =
+        Fd.create (Fd.kind similar_to) fd (Fd.info similar_to)
+      in
+      let stdin =
+        Reader.create (create_fd ~similar_to:(Reader.fd stdin) dupped_stdin)
+      in
+      let stdout =
+        Writer.create (create_fd ~similar_to:(Writer.fd stdout) dupped_stdout)
+      in
+      (stdin, stdout)
+    in
+    let make_sure_stdin_and_stdout_are_not_used () =
+      (* After this, anyone attempting to read from stdin gets an empty result
+         and anything written to stdout goes to stderr instead. *)
+      let dev_null = Core.Std.Unix.openfile ~mode:[O_RDONLY] "/dev/null" in
+      Core.Std.Unix.dup2 ~src:dev_null ~dst:Standard_fd.stdin;
+      Core.Std.Unix.dup2 ~src:Standard_fd.stderr ~dst:Standard_fd.stdout;
+      Core.Std.Unix.close dev_null
+    in
+    let res = make_a_copy_of_stdin_and_stdout () in
+    make_sure_stdin_and_stdout_are_not_used ();
+    res
+
+  let main ?log_not_previously_seen_version impls ~show_menu mode =
     if show_menu then
       let menu_sexp =
         [%sexp_of: (string * int) list] (Map.keys (menu impls))
       in
-      write_sexp stdout menu_sexp;
+      write_sexp (Lazy.force Writer.stdout) menu_sexp;
       return `Success
     else
-      let stdin = Lazy.force Reader.stdin in
+      let stdin, stdout = claim_stdin_and_stdout_for_exclusive_use () in
       match mode with
       | `Bin_prot ->
         begin

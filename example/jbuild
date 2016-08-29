@@ -4,3 +4,9 @@
     async
     core
     command_rpc))))
+
+(unified_tests
+ ((target runtest)
+  (deps (./command_rpc_example.exe))
+  (setup_script setup-script)
+  ))
