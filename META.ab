@@ -1,8 +1,0 @@
-version = "$(pkg_version)"
-description = "Utilities for Versioned RPC communication with a child process over stdin and stdout."
-requires = "async bin_prot core fieldslib ppx_assert.runtime-lib ppx_bench.runtime-lib ppx_expect.collector ppx_hash.runtime-lib ppx_inline_test.runtime-lib sexplib typerep variantslib"
-archive(byte  ) = "command_rpc.cma"
-archive(native) = "command_rpc.cmxa"
-plugin(byte  ) = "command_rpc.cma"
-plugin(native) = "command_rpc.cmxs"
-exists_if = "command_rpc.cma"

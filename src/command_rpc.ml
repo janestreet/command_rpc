@@ -86,21 +86,42 @@ module Command = struct
       reading from /dev/null and [Writer.stdout] is writing to stderr.
   *)
   let claim_stdin_and_stdout_for_exclusive_use () =
+    let same_fd fd1 fd2 =
+      Int.(=)
+        (Core.Std.Unix.File_descr.to_int fd1)
+        (Core.Std.Unix.File_descr.to_int fd2)
+    in
+    let equivalent_fd fd1 fd2 =
+      (* this is the same check [Writer] does when sharing the writer between stderr
+         and stdout *)
+      let dev_and_ino fd =
+        let stats = Core.Std.Unix.fstat fd in
+        (stats.st_dev, stats.st_ino)
+      in
+      same_fd fd1 fd2 || dev_and_ino fd1 = dev_and_ino fd2
+    in
     let stdin  = Lazy.force Reader.stdin  in
     let stdout = Lazy.force Writer.stdout in
     let stderr = Lazy.force Writer.stderr in
-    assert (Int.(=) (Fd.to_int_exn (Reader.fd stdin )) 0);
-    assert (Int.(=) (Fd.to_int_exn (Writer.fd stdout)) 1);
-    assert (Int.(=) (Fd.to_int_exn (Writer.fd stderr)) 2);
     let module Standard_fd = struct
       let stdin  = Core.Std.Unix.File_descr.of_int 0
       let stdout = Core.Std.Unix.File_descr.of_int 1
       let stderr = Core.Std.Unix.File_descr.of_int 2
     end
     in
+    assert (same_fd (Fd.file_descr_exn (Reader.fd stdin)) Standard_fd.stdin);
+    (* Async has a special hack where if file descriptors 1 and 2 happen to point to the
+       same file/device (for example when running in a tty) then it only creates one
+       writer (ignoring file descriptor 2) that's used for both [Writer.stderr] and
+       [Writer.stdout]. In this situation [same_fd] will be false, but [equivalent_fd]
+       will be true and that should be enough to keep sanity below. *)
+    assert (equivalent_fd (Fd.file_descr_exn (Writer.fd stdout)) Standard_fd.stdout);
+    assert (equivalent_fd (Fd.file_descr_exn (Writer.fd stderr)) Standard_fd.stderr);
     let make_a_copy_of_stdin_and_stdout () =
       let dupped_stdin  = Core.Std.Unix.dup Standard_fd.stdin  in
+      Core.Std.Unix.set_close_on_exec dupped_stdin;
       let dupped_stdout = Core.Std.Unix.dup Standard_fd.stdout in
+      Core.Std.Unix.set_close_on_exec dupped_stdout;
       assert (Core.Std.Unix.File_descr.to_int dupped_stdin  > 2);
       assert (Core.Std.Unix.File_descr.to_int dupped_stdout > 2);
       let create_fd ~similar_to fd =

@@ -1,6 +1,5 @@
 (library (
   (name command_rpc)
   (public_name command_rpc)
-  (wrapped false)
   (libraries (async core))
   ))

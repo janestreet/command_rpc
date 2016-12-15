@@ -123,6 +123,31 @@ let v3_implementation_command =
     [ `Plain (module Impl_V3) ]
 ;;
 
+module Spawn_sleep_1000_and_print_its_pid_to_fd_7 = struct
+
+  type query = unit [@@deriving sexp, bin_io]
+  type response = unit [@@deriving sexp, bin_io]
+
+  let rpc =
+    Rpc.Rpc.create
+      ~name:"spawn-sleep-1000-and-print-its-pid-to-fd-7"
+      ~version:1
+      ~bin_query
+      ~bin_response
+
+  let implementation (_: Command_rpc.Command.Invocation.t) () =
+    Process.run_expect_no_output_exn ~prog:"bash" ~args:[
+      "-euo"; "pipefail"; "-c"; "sleep 1000 >/dev/null 2>/dev/null & echo $! >&7"] ()
+
+end
+;;
+
+let spawn_sleep_1000_and_print_its_pid_to_fd_7_command =
+  Command_rpc.Command.create
+    ~summary:"rpc interface"
+    [ `Plain (module Spawn_sleep_1000_and_print_its_pid_to_fd_7) ]
+;;
+
 (* Caller example *)
 let caller_command =
   let version_flag =
@@ -161,6 +186,8 @@ let () =
       [ "v1-implementation", v1_implementation_command;
         "v2-implementation", v2_implementation_command;
         "v3-implementation", v3_implementation_command;
+        "spawn-sleep-1000-and-print-its-pid-to-fd-7",
+        spawn_sleep_1000_and_print_its_pid_to_fd_7_command;
         "caller", caller_command;
       ]
   in
