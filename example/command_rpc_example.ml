@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Async.Std
 
 module V1 = struct
@@ -85,7 +85,7 @@ module Impl_V3 = struct
   let rpc = Protocol.V3.rpc
 
   let implementation (_: Command_rpc.Command.Invocation.t) (x, y) =
-    Core.Std.printf "hello world via Core.Std\n%!";
+    Core.printf "hello world via Core\n%!";
     Async.Std.printf "hello world via Async\n";
     Writer.flushed (Lazy.force Writer.stdout)
     >>= fun () ->

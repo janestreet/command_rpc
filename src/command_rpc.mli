@@ -1,6 +1,6 @@
 (** Utilities for RPC communication with a child process over stdin and stdout. *)
 
-open! Core.Std
+open! Core
 open! Async.Std
 
 (** [Command] is used for setting up an RPC server in the child process.  By default this
@@ -47,7 +47,8 @@ module Command : sig
   ]
 
   val create
-    :  ?log_not_previously_seen_version : (name:string -> int -> unit)
+     : ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
+    -> ?log_not_previously_seen_version : (name:string -> int -> unit)
     -> summary                          : string
     -> t list
     -> Command.t
@@ -55,7 +56,8 @@ end
 
 module Connection : sig
   type 'a with_connection_args
-    =  ?propagate_stderr : bool        (* defaults to true *)
+     = ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
+    -> ?propagate_stderr : bool        (* defaults to true *)
     -> ?env              : Process.env (* defaults to [`Extend []] *)
     -> prog              : string
     -> args              : string list

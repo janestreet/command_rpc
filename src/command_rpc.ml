@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Async.Std
 
 module Command = struct
@@ -88,14 +88,14 @@ module Command = struct
   let claim_stdin_and_stdout_for_exclusive_use () =
     let same_fd fd1 fd2 =
       Int.(=)
-        (Core.Std.Unix.File_descr.to_int fd1)
-        (Core.Std.Unix.File_descr.to_int fd2)
+        (Core.Unix.File_descr.to_int fd1)
+        (Core.Unix.File_descr.to_int fd2)
     in
     let equivalent_fd fd1 fd2 =
       (* this is the same check [Writer] does when sharing the writer between stderr
          and stdout *)
       let dev_and_ino fd =
-        let stats = Core.Std.Unix.fstat fd in
+        let stats = Core.Unix.fstat fd in
         (stats.st_dev, stats.st_ino)
       in
       same_fd fd1 fd2 || dev_and_ino fd1 = dev_and_ino fd2
@@ -104,9 +104,9 @@ module Command = struct
     let stdout = Lazy.force Writer.stdout in
     let stderr = Lazy.force Writer.stderr in
     let module Standard_fd = struct
-      let stdin  = Core.Std.Unix.File_descr.of_int 0
-      let stdout = Core.Std.Unix.File_descr.of_int 1
-      let stderr = Core.Std.Unix.File_descr.of_int 2
+      let stdin  = Core.Unix.File_descr.of_int 0
+      let stdout = Core.Unix.File_descr.of_int 1
+      let stderr = Core.Unix.File_descr.of_int 2
     end
     in
     assert (same_fd (Fd.file_descr_exn (Reader.fd stdin)) Standard_fd.stdin);
@@ -118,12 +118,12 @@ module Command = struct
     assert (equivalent_fd (Fd.file_descr_exn (Writer.fd stdout)) Standard_fd.stdout);
     assert (equivalent_fd (Fd.file_descr_exn (Writer.fd stderr)) Standard_fd.stderr);
     let make_a_copy_of_stdin_and_stdout () =
-      let dupped_stdin  = Core.Std.Unix.dup Standard_fd.stdin  in
-      Core.Std.Unix.set_close_on_exec dupped_stdin;
-      let dupped_stdout = Core.Std.Unix.dup Standard_fd.stdout in
-      Core.Std.Unix.set_close_on_exec dupped_stdout;
-      assert (Core.Std.Unix.File_descr.to_int dupped_stdin  > 2);
-      assert (Core.Std.Unix.File_descr.to_int dupped_stdout > 2);
+      let dupped_stdin  = Core.Unix.dup Standard_fd.stdin  in
+      Core.Unix.set_close_on_exec dupped_stdin;
+      let dupped_stdout = Core.Unix.dup Standard_fd.stdout in
+      Core.Unix.set_close_on_exec dupped_stdout;
+      assert (Core.Unix.File_descr.to_int dupped_stdin  > 2);
+      assert (Core.Unix.File_descr.to_int dupped_stdout > 2);
       let create_fd ~similar_to fd =
         Fd.create (Fd.kind similar_to) fd (Fd.info similar_to)
       in
@@ -138,16 +138,16 @@ module Command = struct
     let make_sure_stdin_and_stdout_are_not_used () =
       (* After this, anyone attempting to read from stdin gets an empty result
          and anything written to stdout goes to stderr instead. *)
-      let dev_null = Core.Std.Unix.openfile ~mode:[O_RDONLY] "/dev/null" in
-      Core.Std.Unix.dup2 ~src:dev_null ~dst:Standard_fd.stdin;
-      Core.Std.Unix.dup2 ~src:Standard_fd.stderr ~dst:Standard_fd.stdout;
-      Core.Std.Unix.close dev_null
+      let dev_null = Core.Unix.openfile ~mode:[O_RDONLY] "/dev/null" in
+      Core.Unix.dup2 ~src:dev_null ~dst:Standard_fd.stdin;
+      Core.Unix.dup2 ~src:Standard_fd.stderr ~dst:Standard_fd.stdout;
+      Core.Unix.close dev_null
     in
     let res = make_a_copy_of_stdin_and_stdout () in
     make_sure_stdin_and_stdout_are_not_used ();
     res
 
-  let main ?log_not_previously_seen_version impls ~show_menu mode =
+  let main ?heartbeat_config ?log_not_previously_seen_version impls ~show_menu mode =
     if show_menu then
       let menu_sexp =
         [%sexp_of: (string * int) list] (Map.keys (menu impls))
@@ -170,7 +170,9 @@ module Command = struct
           | Error (`Duplicate_implementations _) -> return `Failure
           | Ok implementations ->
             Rpc.Connection.server_with_close stdin stdout
-              ~implementations ~connection_state:(fun conn -> Bin_io conn)
+              ?heartbeat_config
+              ~implementations
+              ~connection_state:(fun conn -> Bin_io conn)
               ~on_handshake_error:`Raise
             >>| fun () ->
             `Success
@@ -223,7 +225,7 @@ module Command = struct
   let menu_doc = " dump a sexp representation of the rpc menu"
   let sexp_doc = " speak sexp instead of bin-prot"
 
-  let create ?log_not_previously_seen_version ~summary impls =
+  let create ?heartbeat_config ?log_not_previously_seen_version ~summary impls =
     Command.basic ~summary
       Command.Spec.(
         empty
@@ -231,14 +233,15 @@ module Command = struct
         +> flag "-sexp" no_arg ~doc:sexp_doc)
       (fun show_menu sexp () ->
          async_main
-           (main ?log_not_previously_seen_version impls ~show_menu
+           (main ?heartbeat_config ?log_not_previously_seen_version impls ~show_menu
               (if sexp then `Sexp else `Bin_prot)))
 
 end
 
 module Connection = struct
   type 'a with_connection_args
-    =  ?propagate_stderr : bool        (* defaults to true *)
+     = ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
+    -> ?propagate_stderr : bool        (* defaults to true *)
     -> ?env              : Process.env (* defaults to [`Extend []] *)
     -> prog              : string
     -> args              : string list
@@ -290,12 +293,14 @@ module Connection = struct
     f ~stdin ~stdout ~wait
   ;;
 
-  let with_close ?(propagate_stderr=true) ?(env=`Extend []) ~prog ~args dispatch_queries =
+  let with_close ?heartbeat_config ?(propagate_stderr=true) ?(env=`Extend [])
+        ~prog ~args dispatch_queries =
     connect_gen ~propagate_stderr ~env ~prog ~args
       (fun ~stdin ~stdout ~wait ->
          let%bind result =
            Rpc.Connection.with_close
              stdout stdin
+             ?heartbeat_config
              ~connection_state:(fun _ -> ())
              ~on_handshake_error:(`Call (fun exn -> return (Or_error.of_exn exn)))
              ~dispatch_queries
@@ -305,12 +310,13 @@ module Connection = struct
          return result)
   ;;
 
-  let create ?(propagate_stderr = true) ?(env=`Extend []) ~prog ~args () =
+  let create ?heartbeat_config ?(propagate_stderr = true) ?(env=`Extend []) ~prog ~args () =
     connect_gen ~propagate_stderr ~env ~prog ~args
       (fun ~stdin ~stdout ~wait ->
          don't_wait_for (Deferred.ignore (wait : Unix.Exit_or_signal.t Deferred.t));
          Rpc.Connection.create
            stdout stdin
+           ?heartbeat_config
            ~connection_state:(fun _ -> ())
          >>| Or_error.of_exn_result)
   ;;

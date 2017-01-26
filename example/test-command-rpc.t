@@ -15,7 +15,7 @@ it can't give any ordering guarantee
 
 When run in [-sexp] mode, the implementation command is usable from terminal
   $ echo '((rpc_name command-rpc-demo) (version 3) (query (3 6)))' | "$TEST_DIR"/command_rpc_example.exe v3-implementation -sexp 2>&1
-  hello world via Core.Std
+  hello world via Core
   hello world via Async
   hello world via Async stderr
   hello world via fork&exec
