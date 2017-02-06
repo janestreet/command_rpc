@@ -1,5 +1,5 @@
 open Core
-open Async.Std
+open Async
 
 module V1 = struct
   type query = int [@@deriving bin_io, sexp]
@@ -86,7 +86,7 @@ module Impl_V3 = struct
 
   let implementation (_: Command_rpc.Command.Invocation.t) (x, y) =
     Core.printf "hello world via Core\n%!";
-    Async.Std.printf "hello world via Async\n";
+    Async.printf "hello world via Async\n";
     Writer.flushed (Lazy.force Writer.stdout)
     >>= fun () ->
     Writer.write (Lazy.force Writer.stderr) "hello world via Async stderr\n";

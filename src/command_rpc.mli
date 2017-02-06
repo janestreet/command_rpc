@@ -1,7 +1,7 @@
 (** Utilities for RPC communication with a child process over stdin and stdout. *)
 
 open! Core
-open! Async.Std
+open! Async
 
 (** [Command] is used for setting up an RPC server in the child process.  By default this
     will set up an RPC server, but passing the [-sexp] flag will make it run the
