@@ -10,3 +10,5 @@
   (deps (./command_rpc_example.exe))
   (setup_script setup-script)
   ))
+
+(jbuild_version jane_street)

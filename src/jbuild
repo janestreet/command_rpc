@@ -3,3 +3,5 @@
   (public_name command_rpc)
   (libraries (async core))
   ))
+
+(jbuild_version jane_street)
