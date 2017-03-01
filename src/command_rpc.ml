@@ -268,7 +268,22 @@ module Connection = struct
       else Deferred.Or_error.ok_unit
 
   let connect_gen ~propagate_stderr ~env ~prog ~args f =
-    validate_program_name prog
+    (* [Process.create] when used with the traditional [`ml_create_process] backend has an
+       issue whereby if you give it a non-existent file or a non-executable file, it will
+       return [Ok _]. In that case, the RPC handshake will fail, but that is a much more
+       confusing error message rather than "file does not exist". So, we check for the
+       existence of the file ourself. This is unfortunate, as it means that if the user
+       wishes not to specify the absolute path but instead have [Process.create] search in
+       PATH for the binary, then our check will false-negative.
+
+       The newer [`spawn_vfork] backend does not have this problem, so if people have
+       opted in to that, then we don't have to do the check.
+
+       *)
+    begin match !Core.Unix.create_process_backend with
+    | `ml_create_process -> validate_program_name prog
+    | `spawn_vfork -> Deferred.return (Ok ())
+    end
     >>=? fun () ->
     Process.create ~prog ~args ~env ()
     >>=? fun process ->

@@ -92,7 +92,7 @@ module Impl_V3 = struct
     Writer.write (Lazy.force Writer.stderr) "hello world via Async stderr\n";
     Writer.flushed (Lazy.force Writer.stderr)
     >>= fun () ->
-    Unix.fork_exec ~prog:"echo" ~args:["echo"; "hello world via fork&exec"] ()
+    Unix.fork_exec ~prog:"echo" ~argv:["echo"; "hello world via fork&exec"] ()
     >>= Unix.waitpid
     >>| Unix.Exit_or_signal.or_error
     >>| Or_error.ok_exn
@@ -157,26 +157,36 @@ let caller_command =
       ; "v3", "v3-implementation"
       ]
   in
-  Command.async_or_error
-    Command.Spec.(
-       empty
-       +> flag "-version" ~doc:" rpc version to use" (required version_flag)
-       +> anon ("x" %: int)
-       +> anon ("y" %: int)
-    )
+  let method_flag =
+    Command.Arg_type.Export.sexp_conv
+      [%of_sexp: [`normal | `via_bash | `binary of string]]
+  in
+  let open Command.Let_syntax in
+  Command.async_or_error'
     ~summary:"test"
-    (fun version x y () ->
-       Command_rpc.Connection.with_close
-         ~prog:"/proc/self/exe"
-         ~args:[ version ]
-         (fun connection ->
-            Versioned_rpc.Connection_with_menu.create connection
-            >>=? fun connection_with_menu ->
-            Protocol.dispatch_multi connection_with_menu (x, y)
-            >>|? fun result ->
-            printf "result: %d\n" result
-         )
-    )
+    [%map_open
+      let version = flag "-version" ~doc:" rpc version to use" (required version_flag)
+      and method_ =
+        flag "-method" (optional_with_default `normal method_flag) ~doc:" how to execute"
+      and x = anon ("x" %: int)
+      and y = anon ("y" %: int)
+      in
+      fun () ->
+        let prog, args =
+          match method_ with
+          | `normal         -> Sys.argv.(0) , [version]
+          | `via_bash       -> "bash" , ["-c"; Sys.argv.(0) ^ " " ^ version]
+          | `binary binary  -> binary , [version]
+        in
+        Command_rpc.Connection.with_close ~prog ~args
+          (fun connection ->
+             Versioned_rpc.Connection_with_menu.create connection
+             >>=? fun connection_with_menu ->
+             Protocol.dispatch_multi connection_with_menu (x, y)
+             >>|? fun result ->
+             printf "result: %d\n" result
+          )
+    ]
 ;;
 
 let () =

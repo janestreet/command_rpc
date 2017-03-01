@@ -6,6 +6,45 @@
   $ "$TEST_DIR"/command_rpc_example.exe caller -version v2 10 11
   result: 21
 
+Using a program name that is not absolute but instead should be resolved
+relative to PATH doesn't work (a limitation of Command_rpc) unless we use the
+`spawn_vfork backend to Process.create.
+
+  $ "$TEST_DIR"/command_rpc_example.exe caller -version v2 10 11 -method via_bash
+  (Command_rpc.Connection.connect
+   ((reason "file does not exist") (filename bash)))
+  [1]
+
+  $ CORE_CREATE_PROCESS_USE_SPAWN_BACKEND= "$TEST_DIR"/command_rpc_example.exe caller -version v2 10 11 -method via_bash
+  result: 21
+
+Check that we get good error messages with either Process.create backend when we
+try to execute a non-existent or non-executable file.
+
+  $ "$TEST_DIR"/command_rpc_example.exe caller -version v2 10 11 -method '(binary ./does-not-exist)'
+  (Command_rpc.Connection.connect
+   ((reason "file does not exist") (filename ./does-not-exist)))
+  [1]
+
+  $ CORE_CREATE_PROCESS_USE_SPAWN_BACKEND= "$TEST_DIR"/command_rpc_example.exe caller -version v2 10 11 -method '(binary ./does-not-exist)'
+  (Unix.Unix_error "No such file or directory" Core.Unix.create_process
+   "((prog ./does-not-exist) (args (v2-implementation)) (env (Extend ())))")
+  [1]
+
+  $ touch not-executable
+
+  $ "$TEST_DIR"/command_rpc_example.exe caller -version v2 10 11 -method '(binary not-executable)'
+  (Command_rpc.Connection.connect
+   ((reason "file is not executable") (filename not-executable)))
+  [1]
+
+  $ CORE_CREATE_PROCESS_USE_SPAWN_BACKEND= "$TEST_DIR"/command_rpc_example.exe caller -version v2 10 11 -method '(binary ./not-executable)'
+  (Unix.Unix_error "Permission denied" Core.Unix.create_process
+   "((prog ./not-executable) (args (v2-implementation)) (env (Extend ())))")
+  [1]
+
+
+
 We have to print stdout and stderr of this command separately because
 it can't give any ordering guarantee
   $ STDOUT=$("$TEST_DIR"/command_rpc_example.exe caller -version v3 10 11 2>/dev/null)
