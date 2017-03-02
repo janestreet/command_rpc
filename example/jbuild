@@ -3,12 +3,8 @@
   (libraries (
     async
     core
-    command_rpc))))
+    command_rpc))
+  (preprocess (pps (ppx_jane)))))
 
-(unified_tests
- ((target runtest)
-  (deps (./command_rpc_example.exe))
-  (setup_script setup-script)
-  ))
 
 (jbuild_version jane_street)
