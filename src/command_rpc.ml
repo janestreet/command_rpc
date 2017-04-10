@@ -6,37 +6,75 @@ module Command = struct
     type t = Sexp | Bin_io of Rpc.Connection.t
   end
 
-  module type T = sig
-    type query    [@@deriving of_sexp]
-    type response [@@deriving sexp_of]
-    val rpc : (query, response) Rpc.Rpc.t
-    val implementation : Invocation.t -> query -> response Deferred.t
+  module Stateful = struct
+    module type T = sig
+      type query    [@@deriving of_sexp]
+      type response [@@deriving sexp_of]
+      type state
+      val rpc : (query, response) Rpc.Rpc.t
+      val implementation : state -> query -> response Deferred.t
+    end
+
+    module type T_conv = sig
+      include Versioned_rpc.Callee_converts.Rpc.S
+      type state
+      val name : string
+      val query_of_sexp    : Sexp.t -> query
+      val sexp_of_response : response -> Sexp.t
+      val implementation : state -> query -> response Deferred.t
+    end
+
+    module type T_pipe = sig
+      type query    [@@deriving of_sexp]
+      type response [@@deriving sexp_of]
+      type error    [@@deriving sexp_of]
+      type state
+      val rpc : (query, response, error) Rpc.Pipe_rpc.t
+      val implementation
+        :  state
+        -> query
+        -> (response Pipe.Reader.t, error) Result.t Deferred.t
+    end
+
+    type 'state t = [
+      | `Plain      of (module T      with type state = 'state)
+      | `Plain_conv of (module T_conv with type state = 'state)
+      | `Pipe       of (module T_pipe with type state = 'state)
+    ]
+
+    let lift (type a) (type b) (t : a t) ~(f : b -> a) : b t =
+      match t with
+      | `Plain (module M) ->
+        `Plain (module struct
+          include (M : T with type state := a)
+          type state = b
+          let implementation state query = implementation (f state) query
+        end)
+      | `Plain_conv (module M) ->
+        `Plain_conv (module struct
+          include (M : T_conv with type state := a)
+          type state = b
+          let implementation state query = implementation (f state) query
+        end)
+      | `Pipe (module M) ->
+        `Pipe (module struct
+          include (M : T_pipe with type state := a)
+          type state = b
+          let implementation state query = implementation (f state) query
+        end)
   end
 
-  module type T_conv = sig
-    include Versioned_rpc.Callee_converts.Rpc.S
-    val name : string
-    val query_of_sexp    : Sexp.t -> query
-    val sexp_of_response : response -> Sexp.t
-    val implementation : Invocation.t -> query -> response Deferred.t
-  end
-
-  module type T_pipe = sig
-    type query    [@@deriving of_sexp]
-    type response [@@deriving sexp_of]
-    type error    [@@deriving sexp_of]
-    val rpc : (query, response, error) Rpc.Pipe_rpc.t
-    val implementation
-      :  Invocation.t
-      -> query
-      -> (response Pipe.Reader.t, error) Result.t Deferred.t
-  end
+  module type T      = Stateful.T      with type state := Invocation.t
+  module type T_conv = Stateful.T_conv with type state := Invocation.t
+  module type T_pipe = Stateful.T_pipe with type state := Invocation.t
 
   type t = [
     | `Plain      of (module T)
     | `Plain_conv of (module T_conv)
     | `Pipe       of (module T_pipe)
   ]
+
+  let stateful (rpcs : Invocation.t Stateful.t list) = (rpcs :> t list)
 
   let menu impls =
     match
@@ -167,7 +205,9 @@ module Command = struct
                    (List.concat_map ~f:(implementations ?log_not_previously_seen_version)
                       impls))
           with
-          | Error (`Duplicate_implementations _) -> return `Failure
+          | Error (`Duplicate_implementations descriptions) ->
+            raise_s [%message "duplicate implementations"
+                                (descriptions : Rpc.Description.t list)]
           | Ok implementations ->
             Rpc.Connection.server_with_close stdin stdout
               ?heartbeat_config
@@ -225,17 +265,38 @@ module Command = struct
   let menu_doc = " dump a sexp representation of the rpc menu"
   let sexp_doc = " speak sexp instead of bin-prot"
 
-  let create ?heartbeat_config ?log_not_previously_seen_version ~summary impls =
-    Command.basic ~summary
-      Command.Spec.(
-        empty
-        +> flag "-menu" no_arg ~doc:menu_doc
-        +> flag "-sexp" no_arg ~doc:sexp_doc)
-      (fun show_menu sexp () ->
-         async_main
-           (main ?heartbeat_config ?log_not_previously_seen_version impls ~show_menu
-              (if sexp then `Sexp else `Bin_prot)))
+  module Expert = struct
+    let param_exit_status ?heartbeat_config ?log_not_previously_seen_version () =
+      let open Command.Let_syntax in
+      [%map_open
+        let show_menu = flag "-menu" no_arg ~doc:menu_doc
+        and sexp = flag "-sexp" no_arg ~doc:sexp_doc
+        in fun impls ->
+          main ?heartbeat_config ?log_not_previously_seen_version impls ~show_menu
+            (if sexp then `Sexp else `Bin_prot)
+      ]
 
+    let param ?heartbeat_config ?log_not_previously_seen_version () =
+      Command.Param.map
+        (param_exit_status ?heartbeat_config ?log_not_previously_seen_version ())
+        ~f:(fun main rpcs ->
+          (* If you want to detect success or failure and do something appropriate, you
+             can just do that from your RPC implementation. But we still need
+             [param_exit_status] separately because [create] below doesn't have access to
+             the RPC implementations. *)
+          main rpcs
+          >>| function (`Success | `Failure) -> ())
+  end
+
+  let create ?heartbeat_config ?log_not_previously_seen_version ~summary impls =
+    let open Command.Let_syntax in
+    Command.basic' ~summary
+      [%map_open
+        let main =
+          Expert.param_exit_status ?heartbeat_config ?log_not_previously_seen_version ()
+        in fun () ->
+          async_main (main impls)
+      ]
 end
 
 module Connection = struct

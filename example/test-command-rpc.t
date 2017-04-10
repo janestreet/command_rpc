@@ -50,3 +50,7 @@ And it routes stderr and stdout properly
 
   $ echo '((rpc_name spawn-sleep-1000-and-print-its-pid-to-fd-7) (version 1) (query ()))' | $TEST_DIR/command_rpc_example.exe spawn-sleep-1000-and-print-its-pid-to-fd-7 7>seven.tmp -sexp 2>/dev/null | { cat; kill "$(cat seven.tmp)"; }
   ()
+
+Expert interface works as intended
+  $ "$TEST_DIR"/command_rpc_expert_example.exe caller 19 23
+  42
