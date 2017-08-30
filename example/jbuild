@@ -3,7 +3,8 @@
   (libraries (
     async
     core
-    command_rpc))
+    command_rpc
+    ))
   (preprocess (pps (ppx_jane ppx_driver.runner)))))
 
 

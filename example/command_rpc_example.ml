@@ -189,6 +189,31 @@ let caller_command =
     ]
 ;;
 
+let custom_process_create =
+  let open Command.Let_syntax in
+  Command.async_or_error'
+    ~summary:"test"
+    [%map_open
+      let () = return () in
+      fun () ->
+        (* This example is kind of silly but one can imagine a library for creating
+           processes from binaries stored on some server (exe-server). *)
+        let process_create ~prog ~args ?env () =
+          Process.create ?env ~prog:"/proc/self/exe" ~args:(prog :: args) ()
+        in
+        let prog = "v1-implementation" in
+        let args = [] in
+        Command_rpc.Connection.with_close ~process_create ~prog ~args
+          (fun connection ->
+             Versioned_rpc.Connection_with_menu.create connection
+             >>=? fun connection_with_menu ->
+             Protocol.dispatch_multi connection_with_menu (10, 1)
+             >>|? fun result ->
+             printf "result: %d\n" result
+          )
+    ]
+;;
+
 let () =
   let command =
     Command.group
@@ -199,6 +224,7 @@ let () =
         "spawn-sleep-1000-and-print-its-pid-to-fd-7",
         spawn_sleep_1000_and_print_its_pid_to_fd_7_command;
         "caller", caller_command;
+        "custom-process-create", custom_process_create
       ]
   in
   Command.run command

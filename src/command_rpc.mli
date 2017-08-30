@@ -106,6 +106,13 @@ module Connection : sig
     = ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
     -> ?propagate_stderr : bool        (* defaults to true *)
     -> ?env              : Process.env (* defaults to [`Extend []] *)
+    -> ?process_create   : (prog:string
+                            -> args:string list
+                            -> ?env:Process.env
+                            -> unit
+                            -> Process.t Deferred.Or_error.t)
+    (* defaults to [Process.create]. You may want to use [process_create] to run
+       Command_rpc on binaries from Exe_server. *)
     -> prog              : string
     -> args              : string list
     -> 'a

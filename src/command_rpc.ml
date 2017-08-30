@@ -304,6 +304,7 @@ module Connection = struct
      = ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
     -> ?propagate_stderr : bool        (* defaults to true *)
     -> ?env              : Process.env (* defaults to [`Extend []] *)
+    -> ?process_create   : (prog:string -> args:string list -> ?env:Process.env -> unit -> Process.t Deferred.Or_error.t)
     -> prog              : string
     -> args              : string list
     -> 'a
@@ -328,7 +329,7 @@ module Connection = struct
       then fail "file is not executable"
       else Deferred.Or_error.ok_unit
 
-  let connect_gen ~propagate_stderr ~env ~prog ~args f =
+  let connect_gen ?process_create ~propagate_stderr ~env ~prog ~args f =
     (* [Process.create] when used with the traditional [`ml_create_process] backend has an
        issue whereby if you give it a non-existent file or a non-executable file, it will
        return [Ok _]. In that case, the RPC handshake will fail, but that is a much more
@@ -341,12 +342,17 @@ module Connection = struct
        opted in to that, then we don't have to do the check.
 
        *)
-    begin match !Core.Unix.create_process_backend with
-    | `ml_create_process -> validate_program_name prog
-    | `spawn_vfork -> Deferred.return (Ok ())
+    begin match process_create with
+    | Some process_create ->
+      process_create ~prog ~args ?env:(Some env) ()
+    | None ->
+      begin match !Core.Unix.create_process_backend with
+      | `ml_create_process -> validate_program_name prog
+      | `spawn_vfork -> Deferred.return (Ok ())
+      end
+      >>=? fun () ->
+      Process.create ~prog ~args ~env ()
     end
-    >>=? fun () ->
-    Process.create ~prog ~args ~env ()
     >>=? fun process ->
     let stdin  = Process.stdin  process in
     let stdout = Process.stdout process in
@@ -369,9 +375,9 @@ module Connection = struct
     f ~stdin ~stdout ~wait
   ;;
 
-  let with_close ?heartbeat_config ?(propagate_stderr=true) ?(env=`Extend [])
+  let with_close ?heartbeat_config ?(propagate_stderr=true) ?(env=`Extend []) ?process_create
         ~prog ~args dispatch_queries =
-    connect_gen ~propagate_stderr ~env ~prog ~args
+    connect_gen ?process_create ~propagate_stderr ~env ~prog ~args
       (fun ~stdin ~stdout ~wait ->
          let%bind result =
            Rpc.Connection.with_close
@@ -386,8 +392,8 @@ module Connection = struct
          return result)
   ;;
 
-  let create ?heartbeat_config ?(propagate_stderr = true) ?(env=`Extend []) ~prog ~args () =
-    connect_gen ~propagate_stderr ~env ~prog ~args
+  let create ?heartbeat_config ?(propagate_stderr = true) ?(env=`Extend []) ?process_create ~prog ~args () =
+    connect_gen ?process_create ~propagate_stderr ~env ~prog ~args
       (fun ~stdin ~stdout ~wait ->
          don't_wait_for (Deferred.ignore (wait : Unix.Exit_or_signal.t Deferred.t));
          Rpc.Connection.create
