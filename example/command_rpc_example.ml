@@ -162,7 +162,7 @@ let caller_command =
       [%of_sexp: [`normal | `via_bash | `binary of string]]
   in
   let open Command.Let_syntax in
-  Command.async_or_error'
+  Command.async_or_error
     ~summary:"test"
     [%map_open
       let version = flag "-version" ~doc:" rpc version to use" (required version_flag)
@@ -191,7 +191,7 @@ let caller_command =
 
 let custom_process_create =
   let open Command.Let_syntax in
-  Command.async_or_error'
+  Command.async_or_error
     ~summary:"test"
     [%map_open
       let () = return () in

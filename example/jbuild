@@ -1,5 +1,6 @@
 (executables
  ((names (command_rpc_example command_rpc_expert_example))
+(flags (:standard -safe-string))
   (libraries (
     async
     core

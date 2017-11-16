@@ -35,7 +35,7 @@ let rpcs : state Command_rpc.Command.Stateful.t list =
 
 let callee_command =
   let open Command.Let_syntax in
-  Command.async' ~summary:"rpc interface"
+  Command.async ~summary:"rpc interface"
     [%map_open
       let main = Command_rpc.Command.Expert.param ()
       in fun () ->
@@ -50,7 +50,7 @@ let callee_command =
 
 let caller_command =
   let open Command.Let_syntax in
-  Command.async_or_error' ~summary:"calculate the sum of A and B"
+  Command.async_or_error ~summary:"calculate the sum of A and B"
     [%map_open
       let a = anon ("A" %: int)
       and b = anon ("B" %: int)

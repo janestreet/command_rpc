@@ -290,7 +290,7 @@ module Command = struct
 
   let create ?heartbeat_config ?log_not_previously_seen_version ~summary impls =
     let open Command.Let_syntax in
-    Command.basic' ~summary
+    Command.basic ~summary
       [%map_open
         let main =
           Expert.param_exit_status ?heartbeat_config ?log_not_previously_seen_version ()
