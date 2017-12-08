@@ -314,45 +314,10 @@ module Connection = struct
     >>= fun () ->
     Reader.close child_stderr
 
-  let validate_program_name prog =
-    let fail message =
-      Deferred.Or_error.error "Command_rpc.Connection.connect" () (fun () ->
-        [%sexp { reason = (message : string) ; filename = (prog : string) }])
-    in
-    Sys.file_exists prog
-    >>= function
-    | `No | `Unknown -> fail "file does not exist"
-    | `Yes           ->
-      Unix.stat prog
-      >>= fun stat ->
-      if stat.perm land 0o111 = 0
-      then fail "file is not executable"
-      else Deferred.Or_error.ok_unit
-
-  let connect_gen ?process_create ~propagate_stderr ~env ~prog ~args f =
-    (* [Process.create] when used with the traditional [`ml_create_process] backend has an
-       issue whereby if you give it a non-existent file or a non-executable file, it will
-       return [Ok _]. In that case, the RPC handshake will fail, but that is a much more
-       confusing error message rather than "file does not exist". So, we check for the
-       existence of the file ourself. This is unfortunate, as it means that if the user
-       wishes not to specify the absolute path but instead have [Process.create] search in
-       PATH for the binary, then our check will false-negative.
-
-       The newer [`spawn_vfork] backend does not have this problem, so if people have
-       opted in to that, then we don't have to do the check.
-
-       *)
-    begin match process_create with
-    | Some process_create ->
-      process_create ~prog ~args ?env:(Some env) ()
-    | None ->
-      begin match !Core.Unix.create_process_backend with
-      | `ml_create_process -> validate_program_name prog
-      | `spawn_vfork -> Deferred.return (Ok ())
-      end
-      >>=? fun () ->
-      Process.create ~prog ~args ~env ()
-    end
+  let connect_gen
+        ?(process_create = fun ~prog ~args ?env () -> Process.create ~prog ~args ?env ())
+        ~propagate_stderr ~env ~prog ~args f =
+    process_create ~prog ~args ~env ()
     >>=? fun process ->
     let stdin  = Process.stdin  process in
     let stdout = Process.stdout process in
