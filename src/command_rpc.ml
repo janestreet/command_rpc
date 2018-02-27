@@ -80,17 +80,17 @@ module Command = struct
     match
       Map.Poly.of_alist
         (List.concat_map impls ~f:(fun impl ->
-          match impl with
-          | `Plain plain ->
-            let module T = (val plain : T) in
-            [((Rpc.Rpc.name T.rpc, Rpc.Rpc.version T.rpc), impl)]
-          | `Plain_conv x ->
-            let module T = (val x : T_conv) in
-            let versions = Set.to_list @@ T.versions () in
-            List.map versions ~f:(fun version -> ((T.name, version), impl))
-          | `Pipe pipe ->
-            let module T = (val pipe : T_pipe) in
-            [((Rpc.Pipe_rpc.name T.rpc, Rpc.Pipe_rpc.version T.rpc), impl)]
+           match impl with
+           | `Plain plain ->
+             let module T = (val plain : T) in
+             [((Rpc.Rpc.name T.rpc, Rpc.Rpc.version T.rpc), impl)]
+           | `Plain_conv x ->
+             let module T = (val x : T_conv) in
+             let versions = Set.to_list @@ T.versions () in
+             List.map versions ~f:(fun version -> ((T.name, version), impl))
+           | `Pipe pipe ->
+             let module T = (val pipe : T_pipe) in
+             [((Rpc.Pipe_rpc.name T.rpc, Rpc.Pipe_rpc.version T.rpc), impl)]
          ))
     with
     | `Ok map -> map
@@ -301,7 +301,7 @@ end
 
 module Connection = struct
   type 'a with_connection_args
-     = ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
+    = ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
     -> ?propagate_stderr : bool        (* defaults to true *)
     -> ?env              : Process.env (* defaults to [`Extend []] *)
     -> ?process_create   : (prog:string -> args:string list -> ?env:Process.env -> unit -> Process.t Deferred.Or_error.t)

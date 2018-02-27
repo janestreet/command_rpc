@@ -28,7 +28,7 @@ module Protocol = struct
 
       let query_of_model (x, y) =
         begin if x <> 10 then
-          failwith "v1 only supports adding 10"
+            failwith "v1 only supports adding 10"
         end;
         y
       ;;
