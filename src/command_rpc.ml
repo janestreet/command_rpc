@@ -185,7 +185,8 @@ module Command = struct
     make_sure_stdin_and_stdout_are_not_used ();
     res
 
-  let main ?heartbeat_config ?log_not_previously_seen_version impls ~show_menu mode =
+  let main ?heartbeat_config ?max_message_size ?log_not_previously_seen_version impls
+        ~show_menu mode =
     if show_menu then
       let menu_sexp =
         [%sexp_of: (string * int) list] (Map.keys (menu impls))
@@ -211,6 +212,7 @@ module Command = struct
           | Ok implementations ->
             Rpc.Connection.server_with_close stdin stdout
               ?heartbeat_config
+              ?max_message_size
               ~implementations
               ~connection_state:(fun conn -> Bin_io conn)
               ~on_handshake_error:`Raise
@@ -266,19 +268,21 @@ module Command = struct
   let sexp_doc = " speak sexp instead of bin-prot"
 
   module Expert = struct
-    let param_exit_status ?heartbeat_config ?log_not_previously_seen_version () =
+    let param_exit_status ?heartbeat_config ?max_message_size
+          ?log_not_previously_seen_version () =
       let open Command.Let_syntax in
       [%map_open
         let show_menu = flag "-menu" no_arg ~doc:menu_doc
         and sexp = flag "-sexp" no_arg ~doc:sexp_doc
         in fun impls ->
-          main ?heartbeat_config ?log_not_previously_seen_version impls ~show_menu
-            (if sexp then `Sexp else `Bin_prot)
+          main ?heartbeat_config ?max_message_size ?log_not_previously_seen_version
+            impls ~show_menu (if sexp then `Sexp else `Bin_prot)
       ]
 
-    let param ?heartbeat_config ?log_not_previously_seen_version () =
+    let param ?heartbeat_config ?max_message_size ?log_not_previously_seen_version () =
       Command.Param.map
-        (param_exit_status ?heartbeat_config ?log_not_previously_seen_version ())
+        (param_exit_status ?heartbeat_config ?max_message_size
+           ?log_not_previously_seen_version ())
         ~f:(fun main rpcs ->
           (* If you want to detect success or failure and do something appropriate, you
              can just do that from your RPC implementation. But we still need
@@ -288,12 +292,14 @@ module Command = struct
           >>| function (`Success | `Failure) -> ())
   end
 
-  let create ?heartbeat_config ?log_not_previously_seen_version ~summary impls =
+  let create ?heartbeat_config ?max_message_size ?log_not_previously_seen_version ~summary
+        impls =
     let open Command.Let_syntax in
     Command.basic ~summary
       [%map_open
         let main =
-          Expert.param_exit_status ?heartbeat_config ?log_not_previously_seen_version ()
+          Expert.param_exit_status ?heartbeat_config ?max_message_size
+            ?log_not_previously_seen_version ()
         in fun () ->
           async_main (main impls)
       ]
@@ -302,6 +308,7 @@ end
 module Connection = struct
   type 'a with_connection_args
     = ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
+    -> ?max_message_size:int
     -> ?propagate_stderr : bool        (* defaults to true *)
     -> ?env              : Process.env (* defaults to [`Extend []] *)
     -> ?process_create   : (prog:string -> args:string list -> ?env:Process.env -> unit -> Process.t Deferred.Or_error.t)
@@ -340,14 +347,15 @@ module Connection = struct
     f ~stdin ~stdout ~wait
   ;;
 
-  let with_close ?heartbeat_config ?(propagate_stderr=true) ?(env=`Extend []) ?process_create
-        ~prog ~args dispatch_queries =
+  let with_close ?heartbeat_config ?max_message_size ?(propagate_stderr=true)
+        ?(env=`Extend []) ?process_create ~prog ~args dispatch_queries =
     connect_gen ?process_create ~propagate_stderr ~env ~prog ~args
       (fun ~stdin ~stdout ~wait ->
          let%bind result =
            Rpc.Connection.with_close
              stdout stdin
              ?heartbeat_config
+             ?max_message_size
              ~connection_state:(fun _ -> ())
              ~on_handshake_error:(`Call (fun exn -> return (Or_error.of_exn exn)))
              ~dispatch_queries
@@ -357,13 +365,15 @@ module Connection = struct
          return result)
   ;;
 
-  let create ?heartbeat_config ?(propagate_stderr = true) ?(env=`Extend []) ?process_create ~prog ~args () =
+  let create ?heartbeat_config ?max_message_size ?(propagate_stderr = true)
+        ?(env=`Extend []) ?process_create ~prog ~args () =
     connect_gen ?process_create ~propagate_stderr ~env ~prog ~args
       (fun ~stdin ~stdout ~wait ->
          don't_wait_for (Deferred.ignore (wait : Unix.Exit_or_signal.t Deferred.t));
          Rpc.Connection.create
            stdout stdin
            ?heartbeat_config
+           ?max_message_size
            ~connection_state:(fun _ -> ())
          >>| Or_error.of_exn_result)
   ;;

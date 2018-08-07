@@ -73,6 +73,7 @@ module Command : sig
 
   val create
     :  ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
+    -> ?max_message_size:int
     -> ?log_not_previously_seen_version : (name:string -> int -> unit)
     -> summary                          : string
     -> t list
@@ -95,6 +96,7 @@ module Command : sig
         calling [Command.async_or_error']. *)
     val param
       :  ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
+      -> ?max_message_size:int
       -> ?log_not_previously_seen_version : (name:string -> int -> unit)
       -> unit
       -> (t list -> unit Deferred.t) Command.Param.t
@@ -104,6 +106,7 @@ end
 module Connection : sig
   type 'a with_connection_args
     = ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
+    -> ?max_message_size:int
     -> ?propagate_stderr : bool        (* defaults to true *)
     -> ?env              : Process.env (* defaults to [`Extend []] *)
     -> ?process_create   : (prog:string
