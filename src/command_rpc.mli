@@ -112,8 +112,10 @@ module Connection : sig
     -> ?process_create   : (prog:string
                             -> args:string list
                             -> ?env:Process.env
+                            -> ?working_dir:string
                             -> unit
                             -> Process.t Deferred.Or_error.t)
+    -> ?working_dir      : string
     (* defaults to [Process.create]. You may want to use [process_create] to run
        Command_rpc on binaries from Exe_server. *)
     -> prog              : string

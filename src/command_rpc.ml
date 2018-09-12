@@ -311,7 +311,8 @@ module Connection = struct
     -> ?max_message_size:int
     -> ?propagate_stderr : bool        (* defaults to true *)
     -> ?env              : Process.env (* defaults to [`Extend []] *)
-    -> ?process_create   : (prog:string -> args:string list -> ?env:Process.env -> unit -> Process.t Deferred.Or_error.t)
+    -> ?process_create   : (prog:string -> args:string list -> ?env:Process.env -> ?working_dir:string -> unit -> Process.t Deferred.Or_error.t)
+    -> ?working_dir      : string
     -> prog              : string
     -> args              : string list
     -> 'a
@@ -322,9 +323,10 @@ module Connection = struct
     Reader.close child_stderr
 
   let connect_gen
-        ?(process_create = fun ~prog ~args ?env () -> Process.create ~prog ~args ?env ())
-        ~propagate_stderr ~env ~prog ~args f =
-    process_create ~prog ~args ~env ()
+        ?(process_create = fun ~prog ~args ?env ?working_dir () ->
+          Process.create ~prog ~args ?env ?working_dir ())
+        ~propagate_stderr ~env ~prog ~args ?working_dir f =
+    process_create ~prog ~args ~env ?working_dir ()
     >>=? fun process ->
     let stdin  = Process.stdin  process in
     let stdout = Process.stdout process in
@@ -348,8 +350,8 @@ module Connection = struct
   ;;
 
   let with_close ?heartbeat_config ?max_message_size ?(propagate_stderr=true)
-        ?(env=`Extend []) ?process_create ~prog ~args dispatch_queries =
-    connect_gen ?process_create ~propagate_stderr ~env ~prog ~args
+        ?(env=`Extend []) ?process_create ?working_dir ~prog ~args dispatch_queries =
+    connect_gen ?process_create ~propagate_stderr ~env ~prog ~args ?working_dir
       (fun ~stdin ~stdout ~wait ->
          let%bind result =
            Rpc.Connection.with_close
@@ -366,8 +368,8 @@ module Connection = struct
   ;;
 
   let create ?heartbeat_config ?max_message_size ?(propagate_stderr = true)
-        ?(env=`Extend []) ?process_create ~prog ~args () =
-    connect_gen ?process_create ~propagate_stderr ~env ~prog ~args
+        ?(env=`Extend []) ?process_create ?working_dir ~prog ~args () =
+    connect_gen ?process_create ~propagate_stderr ~env ~prog ~args ?working_dir
       (fun ~stdin ~stdout ~wait ->
          don't_wait_for (Deferred.ignore (wait : Unix.Exit_or_signal.t Deferred.t));
          Rpc.Connection.create

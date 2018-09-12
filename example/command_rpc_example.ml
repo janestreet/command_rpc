@@ -198,8 +198,8 @@ let custom_process_create =
       fun () ->
         (* This example is kind of silly but one can imagine a library for creating
            processes from binaries stored on some server (exe-server). *)
-        let process_create ~prog ~args ?env () =
-          Process.create ?env ~prog:"/proc/self/exe" ~args:(prog :: args) ()
+        let process_create ~prog ~args ?env ?working_dir () =
+          Process.create ?env ~prog:"/proc/self/exe" ~args:(prog :: args) ?working_dir ()
         in
         let prog = "v1-implementation" in
         let args = [] in
