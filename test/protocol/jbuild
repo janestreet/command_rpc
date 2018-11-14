@@ -1,0 +1,11 @@
+(library
+ ((name command_rpc_test_protocol)
+  (libraries (
+    async
+    command_rpc
+    core
+    ))
+  (preprocess (pps (ppx_jane ppxlib.runner)))))
+
+
+(jbuild_version 1)

@@ -44,10 +44,28 @@ module Command : sig
         -> (response Pipe.Reader.t, error) Result.t Deferred.t
     end
 
+    module type T_pipe_conv = sig
+      type query    [@@deriving of_sexp]
+      type response [@@deriving sexp_of]
+      type error    [@@deriving sexp_of]
+      type state
+      include (
+        Versioned_rpc.Callee_converts.Pipe_rpc.S
+        with type query    := query
+        with type response := response
+        with type error    := error
+      )
+      val implementation
+        :  state
+        -> query
+        -> (response Pipe.Reader.t, error) Result.t Deferred.t
+    end
+
     type 'state t = [
-      | `Plain      of (module T      with type state = 'state)
-      | `Plain_conv of (module T_conv with type state = 'state)
-      | `Pipe       of (module T_pipe with type state = 'state)
+      | `Plain      of (module T           with type state = 'state)
+      | `Plain_conv of (module T_conv      with type state = 'state)
+      | `Pipe       of (module T_pipe      with type state = 'state)
+      | `Pipe_conv  of (module T_pipe_conv with type state = 'state)
     ]
 
     (** Given an RPC that expects a state type ['a], it can use a state type ['b] if we
@@ -60,11 +78,13 @@ module Command : sig
   module type T      = Stateful.T      with type state := Invocation.t
   module type T_conv = Stateful.T_conv with type state := Invocation.t
   module type T_pipe = Stateful.T_pipe with type state := Invocation.t
+  module type T_pipe_conv = Stateful.T_pipe_conv with type state := Invocation.t
 
   type t = [
     | `Plain      of (module T)
     | `Plain_conv of (module T_conv)
     | `Pipe       of (module T_pipe)
+    | `Pipe_conv  of (module T_pipe_conv)
   ]
 
   (** You need to call this on your list of stateful RPCs before they can be passed to

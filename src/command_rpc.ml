@@ -36,10 +36,28 @@ module Command = struct
         -> (response Pipe.Reader.t, error) Result.t Deferred.t
     end
 
+    module type T_pipe_conv = sig
+      type query    [@@deriving of_sexp]
+      type response [@@deriving sexp_of]
+      type error    [@@deriving sexp_of]
+      type state
+      include (
+        Versioned_rpc.Callee_converts.Pipe_rpc.S
+        with type query    := query
+        with type response := response
+        with type error    := error
+      )
+      val implementation
+        :  state
+        -> query
+        -> (response Pipe.Reader.t, error) Result.t Deferred.t
+    end
+
     type 'state t = [
-      | `Plain      of (module T      with type state = 'state)
-      | `Plain_conv of (module T_conv with type state = 'state)
-      | `Pipe       of (module T_pipe with type state = 'state)
+      | `Plain      of (module T           with type state = 'state)
+      | `Plain_conv of (module T_conv      with type state = 'state)
+      | `Pipe       of (module T_pipe      with type state = 'state)
+      | `Pipe_conv  of (module T_pipe_conv with type state = 'state)
     ]
 
     let lift (type a) (type b) (t : a t) ~(f : b -> a) : b t =
@@ -62,16 +80,24 @@ module Command = struct
           type state = b
           let implementation state query = implementation (f state) query
         end)
+      | `Pipe_conv (module M) ->
+        `Pipe_conv (module struct
+          include (M : T_pipe_conv with type state := a)
+          type state = b
+          let implementation state query = implementation (f state) query
+        end)
   end
 
-  module type T      = Stateful.T      with type state := Invocation.t
-  module type T_conv = Stateful.T_conv with type state := Invocation.t
-  module type T_pipe = Stateful.T_pipe with type state := Invocation.t
+  module type T           = Stateful.T           with type state := Invocation.t
+  module type T_conv      = Stateful.T_conv      with type state := Invocation.t
+  module type T_pipe      = Stateful.T_pipe      with type state := Invocation.t
+  module type T_pipe_conv = Stateful.T_pipe_conv with type state := Invocation.t
 
   type t = [
     | `Plain      of (module T)
     | `Plain_conv of (module T_conv)
     | `Pipe       of (module T_pipe)
+    | `Pipe_conv  of (module T_pipe_conv)
   ]
 
   let stateful (rpcs : Invocation.t Stateful.t list) = (rpcs :> t list)
@@ -91,6 +117,10 @@ module Command = struct
            | `Pipe pipe ->
              let module T = (val pipe : T_pipe) in
              [((Rpc.Pipe_rpc.name T.rpc, Rpc.Pipe_rpc.version T.rpc), impl)]
+           | `Pipe_conv pipe ->
+             let module T = (val pipe : T_pipe_conv) in
+             let versions = Set.to_list @@ T.versions () in
+             List.map versions ~f:(fun version -> ((T.name, version), impl))
          ))
     with
     | `Ok map -> map
@@ -107,6 +137,9 @@ module Command = struct
           (fun s ~version:_ q -> T.implementation s q)
       | `Pipe (module T) ->
         [Rpc.Pipe_rpc.implement T.rpc T.implementation]
+      | `Pipe_conv (module T) ->
+        T.implement_multi ?log_not_previously_seen_version
+          (fun s ~version:_ q -> T.implementation s q)
 
   type call = {
     rpc_name : string;
@@ -242,6 +275,21 @@ module Command = struct
               write_sexp stdout (T.sexp_of_response response);
               `Success
             | `Pipe (module T) ->
+              begin
+                let query = T.query_of_sexp call.query in
+                T.implementation Sexp query
+                >>= function
+                | Error e ->
+                  write_sexp stdout (T.sexp_of_error e);
+                  return `Failure
+                | Ok pipe ->
+                  Pipe.iter pipe ~f:(fun r ->
+                    write_sexp stdout (T.sexp_of_response r);
+                    Deferred.unit)
+                  >>| fun () ->
+                  `Success
+              end
+            | `Pipe_conv (module T) ->
               let query = T.query_of_sexp call.query in
               T.implementation Sexp query
               >>= function
