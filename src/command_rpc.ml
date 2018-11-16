@@ -1,57 +1,18 @@
 open Core
 open Async
 
+open Command_rpc_intf
+
 module Command = struct
   module Invocation = struct
     type t = Sexp | Bin_io of Rpc.Connection.t
   end
 
   module Stateful = struct
-    module type T = sig
-      type query    [@@deriving of_sexp]
-      type response [@@deriving sexp_of]
-      type state
-      val rpc : (query, response) Rpc.Rpc.t
-      val implementation : state -> query -> response Deferred.t
-    end
-
-    module type T_conv = sig
-      include Versioned_rpc.Callee_converts.Rpc.S
-      type state
-      val name : string
-      val query_of_sexp    : Sexp.t -> query
-      val sexp_of_response : response -> Sexp.t
-      val implementation : state -> query -> response Deferred.t
-    end
-
-    module type T_pipe = sig
-      type query    [@@deriving of_sexp]
-      type response [@@deriving sexp_of]
-      type error    [@@deriving sexp_of]
-      type state
-      val rpc : (query, response, error) Rpc.Pipe_rpc.t
-      val implementation
-        :  state
-        -> query
-        -> (response Pipe.Reader.t, error) Result.t Deferred.t
-    end
-
-    module type T_pipe_conv = sig
-      type query    [@@deriving of_sexp]
-      type response [@@deriving sexp_of]
-      type error    [@@deriving sexp_of]
-      type state
-      include (
-        Versioned_rpc.Callee_converts.Pipe_rpc.S
-        with type query    := query
-        with type response := response
-        with type error    := error
-      )
-      val implementation
-        :  state
-        -> query
-        -> (response Pipe.Reader.t, error) Result.t Deferred.t
-    end
+    module type T = T
+    module type T_conv = T_conv
+    module type T_pipe = T_pipe
+    module type T_pipe_conv = T_pipe_conv
 
     type 'state t = [
       | `Plain      of (module T           with type state = 'state)
