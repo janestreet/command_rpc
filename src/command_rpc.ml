@@ -290,6 +290,7 @@ module Command = struct
       ]
 
     let param ?heartbeat_config ?max_message_size ?log_not_previously_seen_version () =
+
       Command.Param.map
         (param_exit_status ?heartbeat_config ?max_message_size
            ?log_not_previously_seen_version ())
