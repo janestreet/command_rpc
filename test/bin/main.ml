@@ -11,10 +11,10 @@ let pipe_conv_command =
      fun () ->
        serve
          [ `Pipe_conv
-             ( Command_rpc_test_protocol.Heartbeat_pipe_rpc.server
-                 ~min_version
-                 ~max_version
-               :> (module Command_rpc.Command.T_pipe_conv) )
+             (Command_rpc_test_protocol.Heartbeat_pipe_rpc.server
+                ~min_version
+                ~max_version
+              :> (module Command_rpc.Command.T_pipe_conv))
          ])
 ;;
 
