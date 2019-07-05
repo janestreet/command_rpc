@@ -382,7 +382,7 @@ module Connection = struct
         ?(env=`Extend []) ?process_create ?working_dir ~prog ~args () =
     connect_gen ?process_create ~propagate_stderr ~env ~prog ~args ?working_dir
       (fun ~stdin ~stdout ~wait ->
-         don't_wait_for (Deferred.ignore (wait : Unix.Exit_or_signal.t Deferred.t));
+         don't_wait_for (Deferred.ignore_m (wait : Unix.Exit_or_signal.t Deferred.t));
          Rpc.Connection.create
            stdout stdin
            ?heartbeat_config
