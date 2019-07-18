@@ -18,4 +18,21 @@ let pipe_conv_command =
          ])
 ;;
 
-let () = Command.group ~summary:"" [ "pipe-conv", pipe_conv_command ] |> Command.run
+let pipe_direct_command =
+  Command.async
+    ~summary:""
+    (let%map_open.Command.Let_syntax () = return ()
+     and serve = Command_rpc.Command.Expert.param () in
+     fun () ->
+       serve
+         [ `Pipe_direct_bin_io_only
+             (module Command_rpc_test_protocol.Heartbeat_pipe_direct_rpc)
+         ])
+;;
+
+let () =
+  Command.group
+    ~summary:""
+    [ "pipe-conv", pipe_conv_command; "pipe-direct", pipe_direct_command ]
+  |> Command.run
+;;
