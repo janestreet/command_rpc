@@ -4,28 +4,33 @@ open! Core
 open! Async
 
 module type T = sig
-  type query    [@@deriving of_sexp]
+  type query [@@deriving of_sexp]
   type response [@@deriving sexp_of]
   type state
+
   val rpc : (query, response) Rpc.Rpc.t
   val implementation : state -> query -> response Deferred.t
 end
 
 module type T_conv = sig
   include Versioned_rpc.Callee_converts.Rpc.S
+
   type state
+
   val name : string
-  val query_of_sexp    : Sexp.t -> query
+  val query_of_sexp : Sexp.t -> query
   val sexp_of_response : response -> Sexp.t
   val implementation : state -> query -> response Deferred.t
 end
 
 module type T_pipe = sig
-  type query    [@@deriving of_sexp]
+  type query [@@deriving of_sexp]
   type response [@@deriving sexp_of]
-  type error    [@@deriving sexp_of]
+  type error [@@deriving sexp_of]
   type state
+
   val rpc : (query, response, error) Rpc.Pipe_rpc.t
+
   val implementation
     :  state
     -> query
@@ -33,16 +38,17 @@ module type T_pipe = sig
 end
 
 module type T_pipe_conv = sig
-  type query    [@@deriving of_sexp]
+  type query [@@deriving of_sexp]
   type response [@@deriving sexp_of]
-  type error    [@@deriving sexp_of]
+  type error [@@deriving sexp_of]
   type state
-  include (
+
+  include
     Versioned_rpc.Callee_converts.Pipe_rpc.S
-    with type query    := query
+    with type query := query
     with type response := response
-    with type error    := error
-  )
+    with type error := error
+
   val implementation
     :  state
     -> query
@@ -54,12 +60,14 @@ module type T_pipe_direct_bin_io_only = sig
   type response
   type error
   type state
+
   val rpc : (query, response, error) Rpc.Pipe_rpc.t
+
   val implementation
     :  state
     -> query
-    -> response Rpc.Pipe_rpc.Direct_stream_writer.t ->
-    (unit, error) Pervasives.result Deferred.t
+    -> response Rpc.Pipe_rpc.Direct_stream_writer.t
+    -> (unit, error) Result.t Deferred.t
 end
 
 module type Command_rpc = sig
@@ -71,7 +79,9 @@ module type Command_rpc = sig
   *)
   module Command : sig
     module Invocation : sig
-      type t = Sexp | Bin_io of Rpc.Connection.t
+      type t =
+        | Sexp
+        | Bin_io of Rpc.Connection.t
     end
 
     module Stateful : sig
@@ -81,13 +91,14 @@ module type Command_rpc = sig
       module type T_pipe_conv = T_pipe_conv
       module type T_pipe_direct_bin_io_only = T_pipe_direct_bin_io_only
 
-      type 'state t = [
-        | `Plain                   of (module T                         with type state = 'state)
-        | `Plain_conv              of (module T_conv                    with type state = 'state)
-        | `Pipe                    of (module T_pipe                    with type state = 'state)
-        | `Pipe_conv               of (module T_pipe_conv               with type state = 'state)
-        | `Pipe_direct_bin_io_only of (module T_pipe_direct_bin_io_only with type state = 'state)
-      ]
+      type 'state t =
+        [ `Plain of (module T with type state = 'state)
+        | `Plain_conv of (module T_conv with type state = 'state)
+        | `Pipe of (module T_pipe with type state = 'state)
+        | `Pipe_conv of (module T_pipe_conv with type state = 'state)
+        | `Pipe_direct_bin_io_only of
+            (module T_pipe_direct_bin_io_only with type state = 'state)
+        ]
 
       (** Given an RPC that expects a state type ['a], it can use a state type ['b] if we
           tell it how to extract an ['a] from it. Note that this extraction is done on every
@@ -96,19 +107,21 @@ module type Command_rpc = sig
       val lift : 'a t -> f:('b -> 'a) -> 'b t
     end
 
-    module type T      = Stateful.T      with type state := Invocation.t
+    module type T = Stateful.T with type state := Invocation.t
     module type T_conv = Stateful.T_conv with type state := Invocation.t
     module type T_pipe = Stateful.T_pipe with type state := Invocation.t
     module type T_pipe_conv = Stateful.T_pipe_conv with type state := Invocation.t
-    module type T_pipe_direct_bin_io_only = Stateful.T_pipe_direct_bin_io_only with type state := Invocation.t
 
-    type t = [
-      | `Plain                   of (module T)
-      | `Plain_conv              of (module T_conv)
-      | `Pipe                    of (module T_pipe)
-      | `Pipe_conv               of (module T_pipe_conv)
+    module type T_pipe_direct_bin_io_only =
+      Stateful.T_pipe_direct_bin_io_only with type state := Invocation.t
+
+    type t =
+      [ `Plain of (module T)
+      | `Plain_conv of (module T_conv)
+      | `Pipe of (module T_pipe)
+      | `Pipe_conv of (module T_pipe_conv)
       | `Pipe_direct_bin_io_only of (module T_pipe_direct_bin_io_only)
-    ]
+      ]
 
     (** You need to call this on your list of stateful RPCs before they can be passed to
         [create] or (more usually) the function you get in [Expert.param]. *)
@@ -117,8 +130,8 @@ module type Command_rpc = sig
     val create
       :  ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
       -> ?max_message_size:int
-      -> ?log_not_previously_seen_version : (name:string -> int -> unit)
-      -> summary                          : string
+      -> ?log_not_previously_seen_version:(name:string -> int -> unit)
+      -> summary:string
       -> t list
       -> Command.t
 
@@ -140,42 +153,41 @@ module type Command_rpc = sig
       val param
         :  ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
         -> ?max_message_size:int
-        -> ?log_not_previously_seen_version : (name:string -> int -> unit)
+        -> ?log_not_previously_seen_version:(name:string -> int -> unit)
         -> unit
         -> (t list -> unit Deferred.t) Command.Param.t
     end
   end
 
   module Connection : sig
-    type 'a with_connection_args
-      = ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
+    type 'a with_connection_args =
+      ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
       -> ?max_message_size:int
-      -> ?propagate_stderr : bool        (* defaults to true *)
-      -> ?env              : Process.env (* defaults to [`Extend []] *)
-      -> ?process_create   : (prog:string
-                              -> args:string list
-                              -> ?env:Process.env
-                              -> ?working_dir:string
-                              -> unit
-                              -> Process.t Deferred.Or_error.t)
-      -> ?working_dir      : string
+      -> ?propagate_stderr:bool (* defaults to true *)
+      -> ?env:Process.env (* defaults to [`Extend []] *)
+      -> ?process_create:(prog:string
+                          -> args:string list
+                          -> ?env:Process.env
+                          -> ?working_dir:string
+                          -> unit
+                          -> Process.t Deferred.Or_error.t)
+      -> ?working_dir:string
       (* defaults to [Process.create]. You may want to use [process_create] to run
          Command_rpc on binaries from Exe_server. *)
-      -> prog              : string
-      -> args              : string list
+      -> prog:string
+      -> args:string list
       -> 'a
 
     (** [create] spawns a child process and returns an RPC connection that operates on the
         child's stdin and stdout.  The child will be killed and reaped when the connection
         is closed.  If [propagate_stderr] is true, the child's stderr will be printed on the
         parent's stderr; otherwise it will be ignored. *)
-    val create :
-      (unit -> Rpc.Connection.t Or_error.t Deferred.t) with_connection_args
+    val create : (unit -> Rpc.Connection.t Or_error.t Deferred.t) with_connection_args
 
     (** [with_close] spawns a child and connects like [create], calls the function passed in
         on the resulting connection, and then closes the connection and kills the child. *)
-    val with_close :
-      ((Rpc.Connection.t -> 'a Or_error.t Deferred.t) -> 'a Or_error.t Deferred.t)
-        with_connection_args
+    val with_close
+      : ((Rpc.Connection.t -> 'a Or_error.t Deferred.t) -> 'a Or_error.t Deferred.t)
+          with_connection_args
   end
 end
