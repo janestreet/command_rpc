@@ -16,7 +16,7 @@ let test (versions : Versions.t) =
     let rpc =
       Command_rpc_test_protocol.Heartbeat_pipe_rpc.client ~version:versions.client
     in
-    let%bind.Deferred.Or_error.Let_syntax responses, metadata =
+    let%bind.Deferred.Or_error responses, metadata =
       Rpc.Pipe_rpc.dispatch rpc conn n >>| Or_error.join
     in
     let%bind responses = Pipe.to_list responses in
