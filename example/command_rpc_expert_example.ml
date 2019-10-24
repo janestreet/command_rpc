@@ -59,9 +59,10 @@ let caller_command =
           ~prog:(Sys.get_argv ()).(0)
           ~args:[ "callee" ]
           (fun connection ->
-             let%bind () = Rpc.Rpc.dispatch Send_summand.rpc connection a in
-             let%bind () = Rpc.Rpc.dispatch Send_summand.rpc connection b in
-             let%bind sum = Rpc.Rpc.dispatch Get_sum.rpc connection () in
+             let rpc_connection = Command_rpc.Connection.rpc_connection connection in
+             let%bind () = Rpc.Rpc.dispatch Send_summand.rpc rpc_connection a in
+             let%bind () = Rpc.Rpc.dispatch Send_summand.rpc rpc_connection b in
+             let%bind sum = Rpc.Rpc.dispatch Get_sum.rpc rpc_connection () in
              printf "%d\n" sum;
              return ())]
 ;;

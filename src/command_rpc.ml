@@ -383,6 +383,24 @@ module Command = struct
 end
 
 module Connection = struct
+  (* We explicitly [Process.wait] as soon as we start our connection. This guarantees the
+     subprocess gets cleaned up even if the client does not explicitly wait. *)
+  type t =
+    { process : Process.t
+    ; wait : Unix.Exit_or_signal.t Deferred.t
+    ; rpc_connection : Rpc.Connection.t
+    }
+
+  let rpc_connection t = t.rpc_connection
+  let wait t = t.wait
+
+  let kill t signal =
+    (* If the process has already terminated, do not send a signal in case the PID has
+       been reused. *)
+    if not (Deferred.is_determined t.wait)
+    then Signal.send_exn signal (`Pid (Process.pid t.process))
+  ;;
+
   type 'a with_connection_args =
     ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
     -> ?max_message_size:int
@@ -428,7 +446,7 @@ module Connection = struct
       (Writer.close_finished stdin
        >>= fun () -> Reader.close_finished stdout >>= fun () -> Reader.close stderr);
     let wait = Process.wait process in
-    f ~stdin ~stdout ~wait
+    f ~process ~wait
   ;;
 
   let with_close
@@ -449,16 +467,17 @@ module Connection = struct
       ~prog
       ~args
       ?working_dir
-      (fun ~stdin ~stdout ~wait ->
+      (fun ~process ~wait ->
          let%bind result =
            Rpc.Connection.with_close
-             stdout
-             stdin
+             (Process.stdout process)
+             (Process.stdin process)
              ?heartbeat_config
              ?max_message_size
              ~connection_state:(fun _ -> ())
              ~on_handshake_error:(`Call (fun exn -> return (Or_error.of_exn exn)))
-             ~dispatch_queries
+             ~dispatch_queries:(fun rpc_connection ->
+               dispatch_queries { process; wait; rpc_connection })
          in
          let%bind exit_or_signal = wait in
          ignore (exit_or_signal : Unix.Exit_or_signal.t);
@@ -483,14 +502,20 @@ module Connection = struct
       ~prog
       ~args
       ?working_dir
-      (fun ~stdin ~stdout ~wait ->
+      (fun ~process ~wait ->
          don't_wait_for (Deferred.ignore_m (wait : Unix.Exit_or_signal.t Deferred.t));
          Rpc.Connection.create
-           stdout
-           stdin
+           (Process.stdout process)
+           (Process.stdin process)
            ?heartbeat_config
            ?max_message_size
            ~connection_state:(fun _ -> ())
-         >>| Or_error.of_exn_result)
+         >>| Or_error.of_exn_result
+         >>| Or_error.map ~f:(fun rpc_connection -> { process; wait; rpc_connection }))
   ;;
+
+  module Expert = struct
+    let wait = wait
+    let kill = kill
+  end
 end

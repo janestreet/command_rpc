@@ -7,7 +7,11 @@ let test num_heartbeats =
     let open Deferred.Or_error.Let_syntax in
     let rpc = Command_rpc_test_protocol.Heartbeat_pipe_direct_rpc.rpc in
     let%bind responses, _metadata =
-      Rpc.Pipe_rpc.dispatch rpc conn num_heartbeats |> Deferred.map ~f:Or_error.join
+      Rpc.Pipe_rpc.dispatch
+        rpc
+        (Command_rpc.Connection.rpc_connection conn)
+        num_heartbeats
+      |> Deferred.map ~f:Or_error.join
     in
     let%map num_responses = Pipe.to_list responses |> Deferred.ok >>| List.length in
     print_s [%sexp (num_responses : int)]

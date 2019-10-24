@@ -166,7 +166,8 @@ let caller_command =
           | `binary binary -> binary, [ version ]
         in
         Command_rpc.Connection.with_close ~prog ~args (fun connection ->
-          Versioned_rpc.Connection_with_menu.create connection
+          Versioned_rpc.Connection_with_menu.create
+            (Command_rpc.Connection.rpc_connection connection)
           >>=? fun connection_with_menu ->
           Protocol.dispatch_multi connection_with_menu (x, y)
           >>|? fun result -> printf "result: %d\n" result)]
@@ -187,7 +188,8 @@ let custom_process_create =
         let prog = "v1-implementation" in
         let args = [] in
         Command_rpc.Connection.with_close ~process_create ~prog ~args (fun connection ->
-          Versioned_rpc.Connection_with_menu.create connection
+          Versioned_rpc.Connection_with_menu.create
+            (Command_rpc.Connection.rpc_connection connection)
           >>=? fun connection_with_menu ->
           Protocol.dispatch_multi connection_with_menu (10, 1)
           >>|? fun result -> printf "result: %d\n" result)]

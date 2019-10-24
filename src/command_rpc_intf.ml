@@ -160,6 +160,8 @@ module type Command_rpc = sig
   end
 
   module Connection : sig
+    type t
+
     type 'a with_connection_args =
       ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
       -> ?max_message_size:int
@@ -179,15 +181,33 @@ module type Command_rpc = sig
       -> 'a
 
     (** [create] spawns a child process and returns an RPC connection that operates on the
-        child's stdin and stdout.  The child will be killed and reaped when the connection
-        is closed.  If [propagate_stderr] is true, the child's stderr will be printed on the
-        parent's stderr; otherwise it will be ignored. *)
-    val create : (unit -> Rpc.Connection.t Or_error.t Deferred.t) with_connection_args
+        child's stdin and stdout. The child will be killed and reaped when the connection
+        is closed. If [propagate_stderr] is true, the child's stderr will be printed on
+        the parent's stderr; otherwise it will be ignored. *)
+    val create : (unit -> t Or_error.t Deferred.t) with_connection_args
 
-    (** [with_close] spawns a child and connects like [create], calls the function passed in
-        on the resulting connection, and then closes the connection and kills the child. *)
+    (** [with_close] spawns a child and connects like [create], calls the function passed
+        in on the resulting connection, and then closes the connection and kills the
+        child. *)
     val with_close
-      : ((Rpc.Connection.t -> 'a Or_error.t Deferred.t) -> 'a Or_error.t Deferred.t)
+      : ((t -> 'a Or_error.t Deferred.t) -> 'a Or_error.t Deferred.t)
           with_connection_args
+
+    (** Get the RPC connection needed to talk to the command-rpc executable. *)
+    val rpc_connection : t -> Rpc.Connection.t
+
+    (** This module exists for testing purposes only. For example, clients can test
+        whether their command-rpc server cleans up after itself properly when a ctrl-c
+        at the command line kills a whole process group, server included. *)
+    module Expert : sig
+      (** Send a signal to the command-rpc executable.
+
+          Note that this has a (very small) race condition where we can send a signal
+          to a reaped pid if the process dies at exactly the right time. *)
+      val kill : t -> Signal.t -> unit
+
+      (** Wait for termination of the command-rpc executable. *)
+      val wait : t -> Unix.Exit_or_signal.t Deferred.t
+    end
   end
 end
