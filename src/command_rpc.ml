@@ -15,6 +15,8 @@ module Command = struct
     module type T_conv = T_conv
     module type T_pipe = T_pipe
     module type T_pipe_conv = T_pipe_conv
+    module type T_state_bin_io_only = T_state_bin_io_only
+    module type T_state_conv_bin_io_only = T_state_conv_bin_io_only
     module type T_pipe_direct_bin_io_only = T_pipe_direct_bin_io_only
 
     type 'state t =
@@ -24,6 +26,9 @@ module Command = struct
       | `Pipe_conv of (module T_pipe_conv with type state = 'state)
       | `Pipe_direct_bin_io_only of
           (module T_pipe_direct_bin_io_only with type state = 'state)
+      | `State_bin_io_only of (module T_state_bin_io_only with type state = 'state)
+      | `State_conv_bin_io_only of
+          (module T_state_conv_bin_io_only with type state = 'state)
       ]
 
     let lift (type a b) (t : a t) ~(f : b -> a) : b t =
@@ -73,6 +78,24 @@ module Command = struct
 
             let implementation state query = implementation (f state) query
           end)
+      | `State_bin_io_only (module M) ->
+        `State_bin_io_only
+          (module struct
+            include (M : T_state_bin_io_only with type state := a)
+
+            type state = b
+
+            let implementation state query = implementation (f state) query
+          end)
+      | `State_conv_bin_io_only (module M) ->
+        `State_conv_bin_io_only
+          (module struct
+            include (M : T_state_conv_bin_io_only with type state := a)
+
+            type state = b
+
+            let implementation state query = implementation (f state) query
+          end)
     ;;
   end
 
@@ -80,6 +103,12 @@ module Command = struct
   module type T_conv = Stateful.T_conv with type state := Invocation.t
   module type T_pipe = Stateful.T_pipe with type state := Invocation.t
   module type T_pipe_conv = Stateful.T_pipe_conv with type state := Invocation.t
+
+  module type T_state_bin_io_only =
+    Stateful.T_state_bin_io_only with type state := Invocation.t
+
+  module type T_state_conv_bin_io_only =
+    Stateful.T_state_conv_bin_io_only with type state := Invocation.t
 
   module type T_pipe_direct_bin_io_only =
     Stateful.T_pipe_direct_bin_io_only with type state := Invocation.t
@@ -90,6 +119,8 @@ module Command = struct
     | `Pipe of (module T_pipe)
     | `Pipe_conv of (module T_pipe_conv)
     | `Pipe_direct_bin_io_only of (module T_pipe_direct_bin_io_only)
+    | `State_bin_io_only of (module T_state_bin_io_only)
+    | `State_conv_bin_io_only of (module T_state_conv_bin_io_only)
     ]
 
   let stateful (rpcs : Invocation.t Stateful.t list) = (rpcs :> t list)
@@ -111,6 +142,13 @@ module Command = struct
              [ (Rpc.Pipe_rpc.name T.rpc, Rpc.Pipe_rpc.version T.rpc), impl ]
            | `Pipe_conv pipe ->
              let module T = (val pipe : T_pipe_conv) in
+             let versions = Set.to_list @@ T.versions () in
+             List.map versions ~f:(fun version -> (T.name, version), impl)
+           | `State_bin_io_only state ->
+             let module T = (val state : T_state_bin_io_only) in
+             [ (Rpc.State_rpc.name T.rpc, Rpc.State_rpc.version T.rpc), impl ]
+           | `State_conv_bin_io_only state ->
+             let module T = (val state : T_state_conv_bin_io_only) in
              let versions = Set.to_list @@ T.versions () in
              List.map versions ~f:(fun version -> (T.name, version), impl)
            | `Pipe_direct_bin_io_only pipe ->
@@ -135,6 +173,10 @@ module Command = struct
           T.implementation s q)
       | `Pipe_direct_bin_io_only (module T) ->
         [ Rpc.Pipe_rpc.implement_direct T.rpc T.implementation ]
+      | `State_bin_io_only (module T) -> [ Rpc.State_rpc.implement T.rpc T.implementation ]
+      | `State_conv_bin_io_only (module T) ->
+        T.implement_multi ?log_not_previously_seen_version (fun s ~version:_ q ->
+          T.implementation s q)
   ;;
 
   type call =
@@ -301,6 +343,18 @@ module Command = struct
                         write_sexp stdout (T.sexp_of_response r);
                         Deferred.unit)
                       >>| fun () -> `Success)
+                | `State_bin_io_only (module T) ->
+                  failwithf
+                    "state is not supported in [-sexp] mode: (%s, %d)"
+                    call.rpc_name
+                    call.version
+                    ()
+                | `State_conv_bin_io_only (module T) ->
+                  failwithf
+                    "state_conv is not supported in [-sexp] mode: (%s, %d)"
+                    call.rpc_name
+                    call.version
+                    ()
                 | `Pipe_direct_bin_io_only (module T) ->
                   failwithf
                     "pipe_direct is not supported in [-sexp] mode: (%s, %d)"
