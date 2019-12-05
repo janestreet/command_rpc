@@ -23,7 +23,7 @@ let make_serialization (type a) (module M : Stable with type t = a) version =
 
     type t = M.t [@@deriving compare]
 
-    include Binable.Of_binable.V1
+    include Binable.Of_binable.V1 [@alert "-legacy"]
         (Stable_format)
         (struct
           include M
