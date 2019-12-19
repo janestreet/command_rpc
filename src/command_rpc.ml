@@ -191,14 +191,15 @@ module Command = struct
     Writer.newline w
   ;;
 
-  (** This function returns [stdin] and [stdout] as similar to the original [Reader.stdin]
-      and [Writer.stdout] as possible, except they should have new file descriptor numbers
-      (greater than 2) to avoid the other parts of the program writing there by accident.
+  (** This function returns [stdin] and [stdout] that are connected to the same kernel
+      objects (files/pipes/etc) as [Reader.stdin] and [Writer.stdout] before the
+      call, except they will have new file descriptor numbers (greater than 2) to avoid
+      the other parts of the program writing there by accident.
 
       It also changes file descriptors such that after this function [Reader.stdin] is
       reading from /dev/null and [Writer.stdout] is writing to stderr.
   *)
-  let claim_stdin_and_stdout_for_exclusive_use () =
+  let claim_stdin_and_stdout_for_exclusive_use ?buffer_age_limit () =
     let same_fd fd1 fd2 =
       Int.( = ) (Core.Unix.File_descr.to_int fd1) (Core.Unix.File_descr.to_int fd2)
     in
@@ -240,7 +241,9 @@ module Command = struct
       in
       let stdin = Reader.create (create_fd ~similar_to:(Reader.fd stdin) dupped_stdin) in
       let stdout =
-        Writer.create (create_fd ~similar_to:(Writer.fd stdout) dupped_stdout)
+        Writer.create
+          ?buffer_age_limit
+          (create_fd ~similar_to:(Writer.fd stdout) dupped_stdout)
       in
       stdin, stdout
     in
@@ -248,8 +251,8 @@ module Command = struct
       (* After this, anyone attempting to read from stdin gets an empty result
          and anything written to stdout goes to stderr instead. *)
       let dev_null = Core.Unix.openfile ~mode:[ O_RDONLY ] "/dev/null" in
-      Core.Unix.dup2 ~src:dev_null ~dst:Standard_fd.stdin;
-      Core.Unix.dup2 ~src:Standard_fd.stderr ~dst:Standard_fd.stdout;
+      Core.Unix.dup2 ~src:dev_null ~dst:Standard_fd.stdin ();
+      Core.Unix.dup2 ~src:Standard_fd.stderr ~dst:Standard_fd.stdout ();
       Core.Unix.close dev_null
     in
     let res = make_a_copy_of_stdin_and_stdout () in
@@ -261,6 +264,7 @@ module Command = struct
         ?heartbeat_config
         ?max_message_size
         ?log_not_previously_seen_version
+        ?buffer_age_limit
         impls
         ~show_menu
         mode
@@ -271,7 +275,9 @@ module Command = struct
       write_sexp (Lazy.force Writer.stdout) menu_sexp;
       return `Success)
     else (
-      let stdin, stdout = claim_stdin_and_stdout_for_exclusive_use () in
+      let stdin, stdout =
+        claim_stdin_and_stdout_for_exclusive_use ?buffer_age_limit ()
+      in
       match mode with
       | `Bin_prot ->
         (match
@@ -376,41 +382,48 @@ module Command = struct
   let sexp_doc = " speak sexp instead of bin-prot"
 
   module Expert = struct
-    let param_exit_status
-          ?heartbeat_config
-          ?max_message_size
-          ?log_not_previously_seen_version
-          ()
-      =
+    let param_exit_status () =
       let open Command.Let_syntax in
       [%map_open
         let show_menu = flag "-menu" no_arg ~doc:menu_doc
         and sexp = flag "-sexp" no_arg ~doc:sexp_doc in
-        fun impls ->
+        fun ?heartbeat_config
+          ?max_message_size
+          ?log_not_previously_seen_version
+          ?buffer_age_limit
+          impls ->
           main
             ?heartbeat_config
             ?max_message_size
             ?log_not_previously_seen_version
+            ?buffer_age_limit
             impls
             ~show_menu
             (if sexp then `Sexp else `Bin_prot)]
     ;;
 
-    let param ?heartbeat_config ?max_message_size ?log_not_previously_seen_version () =
+    let param () =
       Command.Param.map
-        (param_exit_status
-           ?heartbeat_config
-           ?max_message_size
-           ?log_not_previously_seen_version
-           ())
-        ~f:(fun main rpcs ->
-          (* If you want to detect success or failure and do something appropriate, you
-             can just do that from your RPC implementation. But we still need
-             [param_exit_status] separately because [create] below doesn't have access to
-             the RPC implementations. *)
-          main rpcs
-          >>| function
-          | `Success | `Failure -> ())
+        (param_exit_status ())
+        ~f:(fun main
+             ?heartbeat_config
+             ?max_message_size
+             ?log_not_previously_seen_version
+             ?buffer_age_limit
+             rpcs
+             ->
+               (* If you want to detect success or failure and do something appropriate, you
+                  can just do that from your RPC implementation. But we still need
+                  [param_exit_status] separately because [create] below doesn't have access to
+                  the RPC implementations. *)
+               main
+                 ?heartbeat_config
+                 ?max_message_size
+                 ?log_not_previously_seen_version
+                 ?buffer_age_limit
+                 rpcs
+               >>| function
+               | `Success | `Failure -> ())
     ;;
   end
 
@@ -418,6 +431,7 @@ module Command = struct
         ?heartbeat_config
         ?max_message_size
         ?log_not_previously_seen_version
+        ?buffer_age_limit
         ~summary
         impls
     =
@@ -425,14 +439,15 @@ module Command = struct
     Command.basic
       ~summary
       [%map_open
-        let main =
-          Expert.param_exit_status
-            ?heartbeat_config
-            ?max_message_size
-            ?log_not_previously_seen_version
-            ()
-        in
-        fun () -> async_main (main impls)]
+        let main = Expert.param_exit_status () in
+        fun () ->
+          async_main
+            (main
+               ?heartbeat_config
+               ?max_message_size
+               ?log_not_previously_seen_version
+               ?buffer_age_limit
+               impls)]
   ;;
 end
 

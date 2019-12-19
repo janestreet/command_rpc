@@ -179,17 +179,18 @@ module type Command_rpc = sig
       :  ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
       -> ?max_message_size:int
       -> ?log_not_previously_seen_version:(name:string -> int -> unit)
+      -> ?buffer_age_limit:Writer.buffer_age_limit
       -> summary:string
       -> t list
       -> Command.t
 
     module Expert : sig
-      (** [param ?heartbeat_config ?log_not_previously_seen_version ()] returns a command
-          line parameter which produces a function. You can do any initialization (e.g. of
-          mutable state) and then call the function with your RPC implementations to start
-          the RPC server. The deferred it returns will become determined when the client
-          closes their connection, after which you may do any cleanup you need and then exit
-          (possibly with an appropriate exit status).
+      (** [param ()] returns a command line parameter which produces a function. You can
+          do any initialization (e.g. of mutable state) and then call the function with
+          your RPC implementations to start the RPC server. The deferred it returns will
+          become determined when the client closes their connection, after which you may
+          do any cleanup you need and then exit (possibly with an appropriate exit
+          status).
 
           This interface is marked [Expert] because consuming from stdin or writing to
           stdout during your initialization may prevent you from receiving RPCs or
@@ -199,11 +200,15 @@ module type Command_rpc = sig
           You are responsible for ensuring that the async scheduler is started, e.g., by
           calling [Command.async_or_error']. *)
       val param
-        :  ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
-        -> ?max_message_size:int
-        -> ?log_not_previously_seen_version:(name:string -> int -> unit)
-        -> unit
-        -> (t list -> unit Deferred.t) Command.Param.t
+        :  unit
+        -> (?heartbeat_config:Rpc.Connection.Heartbeat_config.t
+            -> ?max_message_size:int
+            -> ?log_not_previously_seen_version:(name:string -> int -> unit)
+            -> ?buffer_age_limit:Writer.buffer_age_limit
+            (** Set the buffer age limit of the stdout writer *)
+            -> t list
+            -> unit Deferred.t)
+             Command.Param.t
     end
   end
 
