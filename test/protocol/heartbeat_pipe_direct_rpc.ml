@@ -2,10 +2,6 @@ open! Core
 open! Async
 open! Import
 
-type query = int
-type response = unit
-type error = Error.t
-
 let rpc =
   let open Core.Core_stable in
   Rpc.Pipe_rpc.create
@@ -32,3 +28,5 @@ let implementation
      Rpc.Pipe_rpc.Direct_stream_writer.close direct_stream_writer);
   Deferred.Or_error.return ()
 ;;
+
+let implementations = [ Rpc.Pipe_rpc.implement_direct rpc implementation ]

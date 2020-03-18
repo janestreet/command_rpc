@@ -1,7 +1,7 @@
 open! Core
 open! Async
 open! Import
-include Heartbeat_state_rpc_intf
+include Heartbeat_streamable_state_rpc_intf
 
 module type Stable = sig
   type t [@@deriving compare]
@@ -42,24 +42,20 @@ let make_serialization (type a) (module M : Stable with type t = a) version =
 module type Register = functor
   (Version_i : sig
      type query = int [@@deriving bin_io]
-     type update = unit [@@deriving bin_io]
-     type state = unit [@@deriving bin_io]
-     type error = Error.t [@@deriving bin_io]
+     type update = unit
+     type state = unit
+
+     module State : Streamable.S_rpc with type t = state
+     module Update : Streamable.S_rpc with type t = update
 
      val version : int
      val model_of_query : query -> query
-     val error_of_model : error -> error
      val update_of_model : update -> update
      val state_of_model : state -> state
      val client_pushes_back : bool
    end)
   -> sig
-    val rpc
-      : ( Version_i.query
-        , Version_i.state
-        , Version_i.update
-        , Version_i.error )
-          Rpc.State_rpc.t
+    val rpc : (Version_i.query, Version_i.state, Version_i.update) Streamable.State_rpc.t
   end
 
 let register_version (module Register : Register) version =
@@ -67,19 +63,22 @@ let register_version (module Register : Register) version =
     Register (struct
       open Core.Core_stable
       module Query = (val make_serialization (module Int.V1) version)
-      module State = (val make_serialization (module Unit.V1) version)
-      module Update = (val make_serialization (module Unit.V1) version)
-      module Error = (val make_serialization (module Error.V2) version)
+
+      module State =
+        Streamable.Stable.Of_atomic_rpc.V1
+          ((val make_serialization (module Unit.V1) version))
+
+      module Update =
+        Streamable.Stable.Of_atomic_rpc.V1
+          ((val make_serialization (module Unit.V1) version))
 
       type query = Query.t [@@deriving bin_io, compare]
-      type state = State.t [@@deriving bin_io, compare]
-      type update = Update.t [@@deriving bin_io, compare]
-      type error = Error.t [@@deriving bin_io, compare]
+      type state = State.t
+      type update = Update.t
 
       let version = version
       let model_of_query = Fn.id
       let state_of_model = Fn.id
-      let error_of_model = Fn.id
       let update_of_model = Fn.id
       let client_pushes_back = false
     end)
@@ -87,38 +86,59 @@ let register_version (module Register : Register) version =
   M.rpc
 ;;
 
-module Make () = struct
+module type S_make = sig
   type query = int
-  type update = unit
   type initial_state = unit
-  type error = Error.t
+  type update = unit
 
-  include Versioned_rpc.Callee_converts.State_rpc.Make (struct
-      let name = "heartbeat-state"
+  include
+    Streamable.Versioned_state_rpc.Callee_converts.S
+    with type query := query
+     and type update := update
+     and type state := initial_state
 
-      type nonrec query = query
-      type nonrec state = initial_state
-      type nonrec update = update
-      type nonrec error = error
-    end)
+  module Register : Register
 end
 
+let make () =
+  (module struct
+    type query = int
+    type update = unit
+    type initial_state = unit
+
+    include Streamable.Versioned_state_rpc.Callee_converts.Make (struct
+        let name = "heartbeat-streamable-state"
+
+        type nonrec query = query
+        type nonrec state = initial_state
+        type nonrec update = update
+      end)
+  end : S_make)
+;;
+
 let server ~min_version ~max_version =
-  let module X = Make () in
-  let () =
-    assert (Int.( > ) max_version min_version);
-    assert (Int.( > ) min_version 0);
-    for version = min_version to max_version do
-      ignore
-        (register_version (module X.Register) version
-         : (X.query, X.initial_state, X.update, X.error) Rpc.State_rpc.t)
-    done
+  let module M = struct
+    include (val make ())
+
+    let () =
+      assert (Int.( > ) max_version min_version);
+      assert (Int.( > ) min_version 0);
+      for version = min_version to max_version do
+        ignore
+          (register_version (module Register) version
+           : (query, initial_state, update) Streamable.State_rpc.t)
+      done
+    ;;
+
+    let implementation _invocation n =
+      return (Ok ((), Pipe.of_list (List.init n ~f:(const ()))))
+    ;;
+  end
   in
-  X.implement_multi (fun _invocation ~version:_ n ->
-    return (Ok ((), Pipe.of_list (List.init n ~f:(const ())))))
+  M.implement_multi M.implementation
 ;;
 
 let client ~version =
-  let module M = Make () in
+  let module M = (val make ()) in
   register_version (module M.Register) version
 ;;

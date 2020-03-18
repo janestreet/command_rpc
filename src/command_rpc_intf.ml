@@ -55,56 +55,6 @@ module type T_pipe_conv = sig
     -> (response Pipe.Reader.t, error) Result.t Deferred.t
 end
 
-module type T_state_bin_io_only = sig
-  type query
-  type initial_state
-  type update
-  type error
-  type state
-
-  val rpc : (query, initial_state, update, error) Rpc.State_rpc.t
-
-  val implementation
-    :  state
-    -> query
-    -> (initial_state * update Pipe.Reader.t, error) Result.t Deferred.t
-end
-
-module type T_state_conv_bin_io_only = sig
-  type query
-  type initial_state
-  type update
-  type error
-  type state
-
-  include
-    Versioned_rpc.Callee_converts.State_rpc.S
-    with type query := query
-    with type state := initial_state
-    with type update := update
-    with type error := error
-
-  val implementation
-    :  state
-    -> query
-    -> (initial_state * update Pipe.Reader.t, error) Result.t Deferred.t
-end
-
-module type T_pipe_direct_bin_io_only = sig
-  type query
-  type response
-  type error
-  type state
-
-  val rpc : (query, response, error) Rpc.Pipe_rpc.t
-
-  val implementation
-    :  state
-    -> query
-    -> response Rpc.Pipe_rpc.Direct_stream_writer.t
-    -> (unit, error) Result.t Deferred.t
-end
-
 module type Command_rpc = sig
   (** [Command] is used for setting up an RPC server in the child process.  By default this
       will set up an RPC server, but passing the [-sexp] flag will make it run the
@@ -124,20 +74,13 @@ module type Command_rpc = sig
       module type T_conv = T_conv
       module type T_pipe = T_pipe
       module type T_pipe_conv = T_pipe_conv
-      module type T_state_bin_io_only = T_state_bin_io_only
-      module type T_state_conv_bin_io_only = T_state_conv_bin_io_only
-      module type T_pipe_direct_bin_io_only = T_pipe_direct_bin_io_only
 
       type 'state t =
         [ `Plain of (module T with type state = 'state)
         | `Plain_conv of (module T_conv with type state = 'state)
         | `Pipe of (module T_pipe with type state = 'state)
         | `Pipe_conv of (module T_pipe_conv with type state = 'state)
-        | `Pipe_direct_bin_io_only of
-            (module T_pipe_direct_bin_io_only with type state = 'state)
-        | `State_bin_io_only of (module T_state_bin_io_only with type state = 'state)
-        | `State_conv_bin_io_only of
-            (module T_state_conv_bin_io_only with type state = 'state)
+        | `Implementations of 'state Rpc.Implementation.t list
         ]
 
       (** Given an RPC that expects a state type ['a], it can use a state type ['b] if we
@@ -152,23 +95,12 @@ module type Command_rpc = sig
     module type T_pipe = Stateful.T_pipe with type state := Invocation.t
     module type T_pipe_conv = Stateful.T_pipe_conv with type state := Invocation.t
 
-    module type T_state_bin_io_only =
-      Stateful.T_state_bin_io_only with type state := Invocation.t
-
-    module type T_state_conv_bin_io_only =
-      Stateful.T_state_conv_bin_io_only with type state := Invocation.t
-
-    module type T_pipe_direct_bin_io_only =
-      Stateful.T_pipe_direct_bin_io_only with type state := Invocation.t
-
     type t =
       [ `Plain of (module T)
       | `Plain_conv of (module T_conv)
       | `Pipe of (module T_pipe)
       | `Pipe_conv of (module T_pipe_conv)
-      | `Pipe_direct_bin_io_only of (module T_pipe_direct_bin_io_only)
-      | `State_bin_io_only of (module T_state_bin_io_only)
-      | `State_conv_bin_io_only of (module T_state_conv_bin_io_only)
+      | `Implementations of Invocation.t Rpc.Implementation.t list
       ]
 
     (** You need to call this on your list of stateful RPCs before they can be passed to
