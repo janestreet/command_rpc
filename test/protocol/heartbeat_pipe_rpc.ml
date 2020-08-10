@@ -22,8 +22,7 @@ let make_serialization (type a) (module M : Stable with type t = a) version =
 
           let to_stable_format value = { Stable_format.value; version }
 
-          let of_stable_format
-                { Stable_format.value; version = serialized_version }
+          let of_stable_format { Stable_format.value; version = serialized_version }
             =
             assert (Core.Int.( = ) serialized_version version);
             value

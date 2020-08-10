@@ -207,6 +207,8 @@ module Command = struct
   ;;
 
   let main
+        ?connection_description
+        ?handshake_timeout
         ?heartbeat_config
         ?max_message_size
         ?log_not_previously_seen_version
@@ -221,9 +223,7 @@ module Command = struct
       write_sexp (Lazy.force Writer.stdout) menu_sexp;
       return `Success)
     else (
-      let stdin, stdout =
-        claim_stdin_and_stdout_for_exclusive_use ?buffer_age_limit ()
-      in
+      let stdin, stdout = claim_stdin_and_stdout_for_exclusive_use ?buffer_age_limit () in
       match mode with
       | `Bin_prot ->
         (match
@@ -237,12 +237,13 @@ module Command = struct
          with
          | Error (`Duplicate_implementations descriptions) ->
            raise_s
-             [%message
-               "duplicate implementations" (descriptions : Rpc.Description.t list)]
+             [%message "duplicate implementations" (descriptions : Rpc.Description.t list)]
          | Ok implementations ->
            Rpc.Connection.server_with_close
              stdin
              stdout
+             ?description:connection_description
+             ?handshake_timeout
              ?heartbeat_config
              ?max_message_size
              ~implementations
@@ -321,12 +322,16 @@ module Command = struct
       [%map_open
         let show_menu = flag "-menu" no_arg ~doc:menu_doc
         and sexp = flag "-sexp" no_arg ~doc:sexp_doc in
-        fun ?heartbeat_config
+        fun ?connection_description
+          ?handshake_timeout
+          ?heartbeat_config
           ?max_message_size
           ?log_not_previously_seen_version
           ?buffer_age_limit
           impls ->
           main
+            ?connection_description
+            ?handshake_timeout
             ?heartbeat_config
             ?max_message_size
             ?log_not_previously_seen_version
@@ -340,17 +345,21 @@ module Command = struct
       Command.Param.map
         (param_exit_status ())
         ~f:(fun main
+             ?connection_description
+             ?handshake_timeout
              ?heartbeat_config
              ?max_message_size
              ?log_not_previously_seen_version
              ?buffer_age_limit
              rpcs
              ->
-               (* If you want to detect success or failure and do something appropriate, you
-                  can just do that from your RPC implementation. But we still need
-                  [param_exit_status] separately because [create] below doesn't have access to
-                  the RPC implementations. *)
+               (* If you want to detect success or failure and do something appropriate,
+                  you can just do that from your RPC implementation. But we still need
+                  [param_exit_status] separately because [create] below doesn't have
+                  access to the RPC implementations. *)
                main
+                 ?connection_description
+                 ?handshake_timeout
                  ?heartbeat_config
                  ?max_message_size
                  ?log_not_previously_seen_version
@@ -362,6 +371,8 @@ module Command = struct
   end
 
   let create
+        ?connection_description
+        ?handshake_timeout
         ?heartbeat_config
         ?max_message_size
         ?log_not_previously_seen_version
@@ -377,6 +388,8 @@ module Command = struct
         fun () ->
           async_main
             (main
+               ?connection_description
+               ?handshake_timeout
                ?heartbeat_config
                ?max_message_size
                ?log_not_previously_seen_version
@@ -405,16 +418,19 @@ module Connection = struct
   ;;
 
   type 'a with_connection_args =
-    ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
+    ?connection_description:Info.t
+    -> ?handshake_timeout:Time.Span.t
+    -> ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
     -> ?max_message_size:int
     -> ?propagate_stderr:bool (* defaults to true *)
     -> ?env:Process.env (* defaults to [`Extend []] *)
-    -> ?process_create:(prog:string
-                        -> args:string list
-                        -> ?env:Process.env
-                        -> ?working_dir:string
-                        -> unit
-                        -> Process.t Deferred.Or_error.t)
+    -> ?process_create:
+         (prog:string
+          -> args:string list
+          -> ?env:Process.env
+          -> ?working_dir:string
+          -> unit
+          -> Process.t Deferred.Or_error.t)
     -> ?working_dir:string
     -> prog:string
     -> args:string list
@@ -453,6 +469,8 @@ module Connection = struct
   ;;
 
   let with_close
+        ?connection_description
+        ?handshake_timeout
         ?heartbeat_config
         ?max_message_size
         ?(propagate_stderr = true)
@@ -475,6 +493,8 @@ module Connection = struct
            Rpc.Connection.with_close
              (Process.stdout process)
              (Process.stdin process)
+             ?description:connection_description
+             ?handshake_timeout
              ?heartbeat_config
              ?max_message_size
              ~connection_state:(fun _ -> ())
@@ -488,6 +508,8 @@ module Connection = struct
   ;;
 
   let create
+        ?connection_description
+        ?handshake_timeout
         ?heartbeat_config
         ?max_message_size
         ?(propagate_stderr = true)
@@ -510,6 +532,8 @@ module Connection = struct
          Rpc.Connection.create
            (Process.stdout process)
            (Process.stdin process)
+           ?description:connection_description
+           ?handshake_timeout
            ?heartbeat_config
            ?max_message_size
            ~connection_state:(fun _ -> ())

@@ -108,7 +108,9 @@ module type Command_rpc = sig
     val stateful : Invocation.t Stateful.t list -> t list
 
     val create
-      :  ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
+      :  ?connection_description:Info.t
+      -> ?handshake_timeout:Time.Span.t
+      -> ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
       -> ?max_message_size:int
       -> ?log_not_previously_seen_version:(name:string -> int -> unit)
       -> ?buffer_age_limit:Writer.buffer_age_limit
@@ -133,7 +135,9 @@ module type Command_rpc = sig
           calling [Command.async_or_error']. *)
       val param
         :  unit
-        -> (?heartbeat_config:Rpc.Connection.Heartbeat_config.t
+        -> (?connection_description:Info.t
+            -> ?handshake_timeout:Time.Span.t
+            -> ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
             -> ?max_message_size:int
             -> ?log_not_previously_seen_version:(name:string -> int -> unit)
             -> ?buffer_age_limit:Writer.buffer_age_limit
@@ -148,17 +152,21 @@ module type Command_rpc = sig
     type t
 
     type 'a with_connection_args =
-      ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
+      ?connection_description:Info.t
+      -> ?handshake_timeout:Time.Span.t
+      -> ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
       -> ?max_message_size:int
       -> ?propagate_stderr:bool (* defaults to true *)
       -> ?env:Process.env (* defaults to [`Extend []] *)
-      -> ?process_create:(prog:string
-                          -> args:string list
-                          -> ?env:Process.env
-                          -> ?working_dir:string
-                          -> unit
-                          -> Process.t Deferred.Or_error.t)
-      -> ?working_dir:string
+      -> ?process_create:
+           (prog:string
+            -> args:string list
+            -> ?env:Process.env
+            -> ?working_dir:string
+            -> unit
+            -> Process.t Deferred.Or_error.t)
+      -> ?working_dir:
+           string
       (* defaults to [Process.create]. You may want to use [process_create] to run
          Command_rpc on binaries from Exe_server. *)
       -> prog:string
@@ -175,8 +183,7 @@ module type Command_rpc = sig
         in on the resulting connection, and then closes the connection and kills the
         child. *)
     val with_close
-      : ((t -> 'a Or_error.t Deferred.t) -> 'a Or_error.t Deferred.t)
-          with_connection_args
+      : ((t -> 'a Or_error.t Deferred.t) -> 'a Or_error.t Deferred.t) with_connection_args
 
     (** Get the RPC connection needed to talk to the command-rpc executable. *)
     val rpc_connection : t -> Rpc.Connection.t
