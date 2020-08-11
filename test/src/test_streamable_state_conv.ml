@@ -42,13 +42,15 @@ let test (versions : Versions.t) =
 let%expect_test "client is up to date" =
   let%bind () = test { client = 2; server_min = 1; server_max = 2 } in
   [%expect {|
-    "did not raise" |}]
+    "did not raise" |}];
+  return ()
 ;;
 
 let%expect_test "client is acceptably behind" =
   let%bind () = test { client = 1; server_min = 1; server_max = 2 } in
   [%expect {|
-    "did not raise" |}]
+    "did not raise" |}];
+  return ()
 ;;
 
 let%expect_test "client is too far behind" =
@@ -59,7 +61,8 @@ let%expect_test "client is too far behind" =
       (rpc_error (Unimplemented_rpc heartbeat-streamable-state (Version 0)))
       (connection_description <created-directly>)
       (rpc_tag                heartbeat-streamable-state)
-      (rpc_version            0))) |}]
+      (rpc_version            0))) |}];
+  return ()
 ;;
 
 let%expect_test "client is ahead" =
@@ -70,5 +73,6 @@ let%expect_test "client is ahead" =
       (rpc_error (Unimplemented_rpc heartbeat-streamable-state (Version 3)))
       (connection_description <created-directly>)
       (rpc_tag                heartbeat-streamable-state)
-      (rpc_version            3))) |}]
+      (rpc_version            3))) |}];
+  return ()
 ;;

@@ -25,10 +25,10 @@ let test num_heartbeats =
 
 let%expect_test _ =
   let%bind () = test 0 in
-  let%bind () = [%expect {| 0 |}] in
+  [%expect {| 0 |}];
   let%bind () = test 5 in
-  let%bind () = [%expect {| 5 |}] in
+  [%expect {| 5 |}];
   let%bind () = test 100 in
-  let%bind () = [%expect {| 100 |}] in
+  [%expect {| 100 |}];
   return ()
 ;;
