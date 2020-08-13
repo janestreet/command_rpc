@@ -409,13 +409,7 @@ module Connection = struct
 
   let rpc_connection t = t.rpc_connection
   let wait t = t.wait
-
-  let kill t signal =
-    (* If the process has already terminated, do not send a signal in case the PID has
-       been reused. *)
-    if not (Deferred.is_determined t.wait)
-    then Signal.send_exn signal (`Pid (Process.pid t.process))
-  ;;
+  let kill t signal = Process.send_signal t.process signal
 
   type 'a with_connection_args =
     ?connection_description:Info.t
