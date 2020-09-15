@@ -1,1 +1,1 @@
-include Command_rpc_intf.Command_rpc
+include Command_rpc_intf.Command_rpc (** @inline *)

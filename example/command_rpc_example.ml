@@ -142,6 +142,7 @@ let spawn_sleep_1000_and_print_its_pid_to_fd_7_command =
 let caller_command =
   let version_flag =
     Command.Arg_type.of_alist_exn
+      ~list_values_in_help:false
       [ "v1", "v1-implementation"; "v2", "v2-implementation"; "v3", "v3-implementation" ]
   in
   let method_flag =
