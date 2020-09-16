@@ -202,4 +202,5 @@ module type Command_rpc = sig
       val wait : t -> Unix.Exit_or_signal.t Deferred.t
     end
   end
+
 end
