@@ -56,12 +56,11 @@ module type T_pipe_conv = sig
 end
 
 module type Command_rpc = sig
-  (** [Command] is used for setting up an RPC server in the child process.  By default this
-      will set up an RPC server, but passing the [-sexp] flag will make it run the
-      implementation on a sexp read from stdin instead.  Passing the [-menu] flag
-      will cause the command to print out a sexp indicating which RPC names and
-      versions are supported.
-  *)
+  (** [Command] is used for setting up an RPC server in the child process communicating
+      with the parent over stdin&stdout. By default this will use an Async RPC protocol,
+      but passing the [-sexp] flag will make it use a sexp-based interface.  Passing the
+      [-menu] flag will cause the command to print out a sexp indicating which RPC names
+      and versions are supported.  *)
   module Command : sig
     module Invocation : sig
       type t =

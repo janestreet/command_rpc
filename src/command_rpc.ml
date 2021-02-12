@@ -344,7 +344,8 @@ module Command = struct
     let param () =
       Command.Param.map
         (param_exit_status ())
-        ~f:(fun main
+        ~f:(fun
+             main
              ?connection_description
              ?handshake_timeout
              ?heartbeat_config
