@@ -1,6 +1,16 @@
 open! Core
 open! Async
 
+let caller_implementations_command =
+  Command.async
+    ~summary:""
+    (let%map_open.Command () = return ()
+     and serve = Command_rpc.Command.Expert.param () in
+     fun () ->
+       serve
+         [ `Plain (module Command_rpc_test_protocol.Caller_implementations_rpcs.Callee) ])
+;;
+
 let pipe_conv_command =
   Command.async
     ~summary:""
@@ -65,7 +75,8 @@ let streamable_state_conv_command =
 let () =
   Command.group
     ~summary:""
-    [ "pipe-conv", pipe_conv_command
+    [ "caller-implementations", caller_implementations_command
+    ; "pipe-conv", pipe_conv_command
     ; "pipe-direct", pipe_direct_command
     ; "state-conv", state_conv_command
     ; "streamable-state-conv", streamable_state_conv_command

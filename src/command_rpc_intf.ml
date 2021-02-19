@@ -155,6 +155,7 @@ module type Command_rpc = sig
       -> ?handshake_timeout:Time.Span.t
       -> ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
       -> ?max_message_size:int
+      -> ?implementations:unit Rpc.Implementations.t
       -> ?propagate_stderr:bool (* defaults to true *)
       -> ?env:Process.env (* defaults to [`Extend []] *)
       -> ?process_create:
@@ -178,9 +179,11 @@ module type Command_rpc = sig
         the parent's stderr; otherwise it will be ignored. *)
     val create : (unit -> t Or_error.t Deferred.t) with_connection_args
 
-    (** [with_close] spawns a child and connects like [create], calls the function passed
-        in on the resulting connection, and then closes the connection and kills the
-        child. *)
+    (** [with_close] spawns a child and connects like [create], then calls the function
+        passed in on the resulting connection. Like [Rpc.Connection.with_close], if
+        [implementations] is passed, [with_close] will not return until the connection is
+        closed by either the parent or the child; otherwise, it closes the connection and
+        kills the child when the provided function returns. *)
     val with_close
       : ((t -> 'a Or_error.t Deferred.t) -> 'a Or_error.t Deferred.t) with_connection_args
 

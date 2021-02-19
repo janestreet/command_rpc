@@ -417,6 +417,7 @@ module Connection = struct
     -> ?handshake_timeout:Time.Span.t
     -> ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
     -> ?max_message_size:int
+    -> ?implementations:unit Rpc.Implementations.t
     -> ?propagate_stderr:bool (* defaults to true *)
     -> ?env:Process.env (* defaults to [`Extend []] *)
     -> ?process_create:
@@ -468,6 +469,7 @@ module Connection = struct
         ?handshake_timeout
         ?heartbeat_config
         ?max_message_size
+        ?implementations
         ?(propagate_stderr = true)
         ?(env = `Extend [])
         ?process_create
@@ -492,6 +494,7 @@ module Connection = struct
              ?handshake_timeout
              ?heartbeat_config
              ?max_message_size
+             ?implementations
              ~connection_state:(fun _ -> ())
              ~on_handshake_error:(`Call (fun exn -> return (Or_error.of_exn exn)))
              ~dispatch_queries:(fun rpc_connection ->
@@ -507,6 +510,7 @@ module Connection = struct
         ?handshake_timeout
         ?heartbeat_config
         ?max_message_size
+        ?implementations
         ?(propagate_stderr = true)
         ?(env = `Extend [])
         ?process_create
@@ -531,6 +535,7 @@ module Connection = struct
            ?handshake_timeout
            ?heartbeat_config
            ?max_message_size
+           ?implementations
            ~connection_state:(fun _ -> ())
          >>| Or_error.of_exn_result
          >>| Or_error.map ~f:(fun rpc_connection -> { process; wait; rpc_connection }))
