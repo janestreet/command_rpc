@@ -73,4 +73,4 @@ let command =
     [ "callee", callee_command; "caller", caller_command ]
 ;;
 
-let () = Command.run command
+let () = Command_unix.run command

@@ -147,13 +147,13 @@ module Command = struct
   *)
   let claim_stdin_and_stdout_for_exclusive_use ?buffer_age_limit () =
     let same_fd fd1 fd2 =
-      Int.( = ) (Core.Unix.File_descr.to_int fd1) (Core.Unix.File_descr.to_int fd2)
+      Int.( = ) (Core_unix.File_descr.to_int fd1) (Core_unix.File_descr.to_int fd2)
     in
     let equivalent_fd fd1 fd2 =
       (* this is the same check [Writer] does when sharing the writer between stderr
          and stdout *)
       let dev_and_ino fd =
-        let stats = Core.Unix.fstat fd in
+        let stats = Core_unix.fstat fd in
         stats.st_dev, stats.st_ino
       in
       same_fd fd1 fd2 || dev_and_ino fd1 = dev_and_ino fd2
@@ -162,9 +162,9 @@ module Command = struct
     let stdout = Lazy.force Writer.stdout in
     let stderr = Lazy.force Writer.stderr in
     let module Standard_fd = struct
-      let stdin = Core.Unix.File_descr.of_int 0
-      let stdout = Core.Unix.File_descr.of_int 1
-      let stderr = Core.Unix.File_descr.of_int 2
+      let stdin = Core_unix.File_descr.of_int 0
+      let stdout = Core_unix.File_descr.of_int 1
+      let stderr = Core_unix.File_descr.of_int 2
     end
     in
     assert (same_fd (Fd.file_descr_exn (Reader.fd stdin)) Standard_fd.stdin);
@@ -176,12 +176,12 @@ module Command = struct
     assert (equivalent_fd (Fd.file_descr_exn (Writer.fd stdout)) Standard_fd.stdout);
     assert (equivalent_fd (Fd.file_descr_exn (Writer.fd stderr)) Standard_fd.stderr);
     let make_a_copy_of_stdin_and_stdout () =
-      let dupped_stdin = Core.Unix.dup Standard_fd.stdin in
-      Core.Unix.set_close_on_exec dupped_stdin;
-      let dupped_stdout = Core.Unix.dup Standard_fd.stdout in
-      Core.Unix.set_close_on_exec dupped_stdout;
-      assert (Core.Unix.File_descr.to_int dupped_stdin > 2);
-      assert (Core.Unix.File_descr.to_int dupped_stdout > 2);
+      let dupped_stdin = Core_unix.dup Standard_fd.stdin in
+      Core_unix.set_close_on_exec dupped_stdin;
+      let dupped_stdout = Core_unix.dup Standard_fd.stdout in
+      Core_unix.set_close_on_exec dupped_stdout;
+      assert (Core_unix.File_descr.to_int dupped_stdin > 2);
+      assert (Core_unix.File_descr.to_int dupped_stdout > 2);
       let create_fd ~similar_to fd =
         Fd.create (Fd.kind similar_to) fd (Fd.info similar_to)
       in
@@ -196,10 +196,10 @@ module Command = struct
     let make_sure_stdin_and_stdout_are_not_used () =
       (* After this, anyone attempting to read from stdin gets an empty result
          and anything written to stdout goes to stderr instead. *)
-      let dev_null = Core.Unix.openfile ~mode:[ O_RDONLY ] "/dev/null" in
-      Core.Unix.dup2 ~src:dev_null ~dst:Standard_fd.stdin ();
-      Core.Unix.dup2 ~src:Standard_fd.stderr ~dst:Standard_fd.stdout ();
-      Core.Unix.close dev_null
+      let dev_null = Core_unix.openfile ~mode:[ O_RDONLY ] "/dev/null" in
+      Core_unix.dup2 ~src:dev_null ~dst:Standard_fd.stdin ();
+      Core_unix.dup2 ~src:Standard_fd.stderr ~dst:Standard_fd.stdout ();
+      Core_unix.close dev_null
     in
     let res = make_a_copy_of_stdin_and_stdout () in
     make_sure_stdin_and_stdout_are_not_used ();

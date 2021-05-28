@@ -16,14 +16,14 @@ Check that we get good error messages when we
 try to execute a non-existent or non-executable file.
 
   $ "$TEST_DIR"/command_rpc_example.exe caller -version v2 10 11 -method '(binary ./does-not-exist)'
-  (Unix.Unix_error "No such file or directory" Core.Unix.create_process
+  (Unix.Unix_error "No such file or directory" Core_unix.create_process
    "((prog ./does-not-exist) (args (v2-implementation)) (env (Extend ())))")
   [1]
 
   $ touch not-executable
 
   $ "$TEST_DIR"/command_rpc_example.exe caller -version v2 10 11 -method '(binary ./not-executable)'
-  (Unix.Unix_error "Permission denied" Core.Unix.create_process
+  (Unix.Unix_error "Permission denied" Core_unix.create_process
    "((prog ./not-executable) (args (v2-implementation)) (env (Extend ())))")
   [1]
 

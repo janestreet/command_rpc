@@ -81,5 +81,5 @@ let () =
     ; "state-conv", state_conv_command
     ; "streamable-state-conv", streamable_state_conv_command
     ]
-  |> Command.run
+  |> Command_unix.run
 ;;

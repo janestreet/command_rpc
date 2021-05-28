@@ -209,5 +209,5 @@ let () =
       ; "custom-process-create", custom_process_create
       ]
   in
-  Command.run command
+  Command_unix.run command
 ;;

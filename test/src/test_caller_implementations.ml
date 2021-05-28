@@ -2,6 +2,8 @@ open! Core
 open! Async
 open! Import
 
+let () = Backtrace.elide := true
+
 let test mode =
   match mode with
   | `Sexp ->
