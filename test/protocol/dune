@@ -1,2 +1,3 @@
 (library (name command_rpc_test_protocol)
- (libraries async command_rpc core streamable) (preprocess (pps ppx_jane)))
+ (libraries async command_rpc core_kernel.core streamable)
+ (preprocess (pps ppx_jane)))
