@@ -42,7 +42,9 @@ module Command = struct
 
             type state = b
 
-            let implementation state query = implementation (f state) query
+            let implementation state ~version query =
+              implementation (f state) ~version query
+            ;;
           end)
       | `Pipe (module M) ->
         `Pipe
@@ -60,7 +62,9 @@ module Command = struct
 
             type state = b
 
-            let implementation state query = implementation (f state) query
+            let implementation state ~version query =
+              implementation (f state) ~version query
+            ;;
           end)
       | `Implementations impls ->
         `Implementations (List.map impls ~f:(Rpc.Implementation.lift ~f))
@@ -116,12 +120,12 @@ module Command = struct
     = function
       | `Plain (module T) -> [ Rpc.Rpc.implement T.rpc T.implementation ]
       | `Plain_conv (module T) ->
-        T.implement_multi ?log_not_previously_seen_version (fun s ~version:_ q ->
-          T.implementation s q)
+        T.implement_multi ?log_not_previously_seen_version (fun s ~version q ->
+          T.implementation s ~version q)
       | `Pipe (module T) -> [ Rpc.Pipe_rpc.implement T.rpc T.implementation ]
       | `Pipe_conv (module T) ->
-        T.implement_multi ?log_not_previously_seen_version (fun s ~version:_ q ->
-          T.implementation s q)
+        T.implement_multi ?log_not_previously_seen_version (fun s ~version q ->
+          T.implementation s ~version q)
       | `Implementations impls -> impls
   ;;
 
@@ -268,7 +272,7 @@ module Command = struct
                   `Success
                 | `Plain_conv (module T) ->
                   let query = T.query_of_sexp call.query in
-                  T.implementation Sexp query
+                  T.implementation Sexp ~version:call.version query
                   >>| fun response ->
                   write_sexp stdout (T.sexp_of_response response);
                   `Success
@@ -286,7 +290,7 @@ module Command = struct
                       >>| fun () -> `Success)
                 | `Pipe_conv (module T) ->
                   let query = T.query_of_sexp call.query in
-                  T.implementation Sexp query
+                  T.implementation Sexp ~version:call.version query
                   >>= (function
                     | Error e ->
                       write_sexp stdout (T.sexp_of_error e);

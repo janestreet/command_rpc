@@ -35,7 +35,7 @@ let make_serialization (type a) (module M : Stable with type t = a) version =
 module type Register = functor
   (Version_i : sig
      type query = int [@@deriving bin_io]
-     type response = unit [@@deriving bin_io]
+     type response = int [@@deriving bin_io]
      type error = Error.t [@@deriving bin_io]
 
      val version : int
@@ -53,7 +53,7 @@ let register_version (module Register : Register) version =
     Register (struct
       open Core.Core_stable
       module Query = (val make_serialization (module Int.V1) version)
-      module Response = (val make_serialization (module Unit.V1) version)
+      module Response = (val make_serialization (module Int.V1) version)
       module Error = (val make_serialization (module Error.V2) version)
 
       type query = Query.t [@@deriving bin_io, compare, sexp]
@@ -72,7 +72,7 @@ let register_version (module Register : Register) version =
 
 module type S_make = sig
   type query = int [@@deriving of_sexp]
-  type response = unit [@@deriving sexp_of]
+  type response = int [@@deriving sexp_of]
   type error = Error.t [@@deriving sexp_of]
 
   include
@@ -87,7 +87,7 @@ end
 let make () =
   (module struct
     type query = int [@@deriving of_sexp]
-    type response = unit [@@deriving sexp_of]
+    type response = int [@@deriving sexp_of]
     type error = Error.t [@@deriving sexp_of]
 
     include Versioned_rpc.Callee_converts.Pipe_rpc.Make (struct
@@ -114,8 +114,8 @@ let server ~min_version ~max_version =
       done
     ;;
 
-    let implementation _invocation n =
-      return (Ok (Pipe.of_list (List.init n ~f:(const ()))))
+    let implementation _invocation ~version n =
+      return (Ok (Pipe.of_list (List.init n ~f:(const version))))
     ;;
   end : S)
 ;;

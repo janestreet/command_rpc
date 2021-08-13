@@ -20,7 +20,7 @@ module type T_conv = sig
   val name : string
   val query_of_sexp : Sexp.t -> query
   val sexp_of_response : response -> Sexp.t
-  val implementation : state -> query -> response Deferred.t
+  val implementation : state -> version:int -> query -> response Deferred.t
 end
 
 module type T_pipe = sig
@@ -51,6 +51,7 @@ module type T_pipe_conv = sig
 
   val implementation
     :  state
+    -> version:int
     -> query
     -> (response Pipe.Reader.t, error) Result.t Deferred.t
 end

@@ -38,19 +38,26 @@ let test (versions : Versions.t) =
          |> List.concat)
   in
   show_raise ~hide_positions:true (fun () ->
-    [%test_eq: unit list] (ok_exn result) (List.init n ~f:ignore));
+    let result = ok_exn result in
+    [%test_eq: int] (List.length result) n;
+    let unique = List.all_equal ~equal:Int.equal result |> Option.value_exn in
+    printf "Version used by server: %d\n" unique);
   Deferred.unit
 ;;
 
 let%expect_test "client is up to date" =
   let%bind () = test { client = 2; server_min = 1; server_max = 2 } in
-  [%expect {| "did not raise" |}];
+  [%expect {|
+    Version used by server: 2
+    "did not raise" |}];
   return ()
 ;;
 
 let%expect_test "client is acceptably behind" =
   let%bind () = test { client = 1; server_min = 1; server_max = 2 } in
-  [%expect {| "did not raise" |}];
+  [%expect {|
+    Version used by server: 1
+    "did not raise" |}];
   return ()
 ;;
 
