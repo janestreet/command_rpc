@@ -28,6 +28,7 @@ let test (versions : Versions.t) =
   in
   let%bind result =
     Command_rpc.Connection.with_close
+      ~wait_for_stderr_transfer:true
       get_all_responses
       ~prog:"../bin/main.exe"
       ~args:

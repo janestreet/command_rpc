@@ -40,6 +40,17 @@ let pipe_direct_command =
          ])
 ;;
 
+let logged_to_stderr_command =
+  Command.async
+    ~summary:""
+    (let%map_open.Command () = return ()
+     and serve = Command_rpc.Command.Expert.param () in
+     fun () ->
+       serve
+         [ `Implementations Command_rpc_test_protocol.Rpc_logged_to_stderr.implementations
+         ])
+;;
+
 let state_conv_command =
   Command.async
     ~summary:""
@@ -78,6 +89,7 @@ let () =
     [ "caller-implementations", caller_implementations_command
     ; "pipe-conv", pipe_conv_command
     ; "pipe-direct", pipe_direct_command
+    ; "logged-to-stderr", logged_to_stderr_command
     ; "state-conv", state_conv_command
     ; "streamable-state-conv", streamable_state_conv_command
     ]

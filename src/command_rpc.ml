@@ -417,7 +417,8 @@ module Connection = struct
   let kill t signal = Process.send_signal t.process signal
 
   type 'a with_connection_args =
-    ?connection_description:Info.t
+    ?wait_for_stderr_transfer:bool
+    -> ?connection_description:Info.t
     -> ?handshake_timeout:Time.Span.t
     -> ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
     -> ?max_message_size:int
@@ -442,6 +443,7 @@ module Connection = struct
   ;;
 
   let connect_gen
+        ?(wait_for_stderr_transfer = false)
         ?(process_create =
           fun ~prog ~args ?env ?working_dir () ->
             Process.create ~prog ~args ?env ?working_dir ())
@@ -457,18 +459,30 @@ module Connection = struct
     let stdin = Process.stdin process in
     let stdout = Process.stdout process in
     let stderr = Process.stderr process in
-    don't_wait_for
-      (if propagate_stderr then transfer_stderr stderr else Reader.drain stderr);
-    (* This is mainly so that when a user closes the connection (which closes stdin and
-       stdout) we will also close stderr. *)
-    don't_wait_for
-      (Writer.close_finished stdin
-       >>= fun () -> Reader.close_finished stdout >>= fun () -> Reader.close stderr);
+    let stderr_flushed =
+      if propagate_stderr then transfer_stderr stderr else Reader.drain stderr
+    in
+    if not wait_for_stderr_transfer
+    then
+      (* This is mainly so that when a user closes the connection (which closes stdin and
+         stdout) we will also close stderr. *)
+      don't_wait_for
+        (Writer.close_finished stdin
+         >>= fun () -> Reader.close_finished stdout >>= fun () -> Reader.close stderr);
     let wait = Process.wait process in
+    let wait =
+      match wait_for_stderr_transfer with
+      | false -> wait
+      | true ->
+        let%map wait = wait
+        and () = stderr_flushed in
+        wait
+    in
     f ~process ~wait
   ;;
 
   let with_close
+        ?wait_for_stderr_transfer
         ?connection_description
         ?handshake_timeout
         ?heartbeat_config
@@ -483,6 +497,7 @@ module Connection = struct
         dispatch_queries
     =
     connect_gen
+      ?wait_for_stderr_transfer
       ?process_create
       ~propagate_stderr
       ~env
@@ -510,6 +525,7 @@ module Connection = struct
   ;;
 
   let create
+        ?wait_for_stderr_transfer
         ?connection_description
         ?handshake_timeout
         ?heartbeat_config
@@ -524,6 +540,7 @@ module Connection = struct
         ()
     =
     connect_gen
+      ?wait_for_stderr_transfer
       ?process_create
       ~propagate_stderr
       ~env
@@ -531,7 +548,6 @@ module Connection = struct
       ~args
       ?working_dir
       (fun ~process ~wait ->
-         don't_wait_for (Deferred.ignore_m (wait : Unix.Exit_or_signal.t Deferred.t));
          Rpc.Connection.create
            (Process.stdout process)
            (Process.stdin process)

@@ -61,7 +61,13 @@ module type Command_rpc = sig
       with the parent over stdin&stdout. By default this will use an Async RPC protocol,
       but passing the [-sexp] flag will make it use a sexp-based interface.  Passing the
       [-menu] flag will cause the command to print out a sexp indicating which RPC names
-      and versions are supported.  *)
+      and versions are supported.
+
+      Since stdout is used for communication with the parent process, it's not available
+      for use as a debug output channel. We remap the file descriptors in the child
+      in such a way that any attempted write to stdout gets sent to stderr instead.
+      Then stderr can be forwarded to stderr of the parent if [propagate_stderr = true].
+  *)
   module Command : sig
     module Invocation : sig
       type t =
@@ -152,7 +158,12 @@ module type Command_rpc = sig
     type t
 
     type 'a with_connection_args =
-      ?connection_description:Info.t
+      ?wait_for_stderr_transfer:
+        bool
+      (* Defaults to [false]. If set to true, makes
+         [with_close] and [Expert.wait] wait for stderr to have been
+         fully propagated (or drained). *)
+      -> ?connection_description:Info.t
       -> ?handshake_timeout:Time.Span.t
       -> ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
       -> ?max_message_size:int
