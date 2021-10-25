@@ -165,24 +165,18 @@ module Command = struct
     let stdin = Lazy.force Reader.stdin in
     let stdout = Lazy.force Writer.stdout in
     let stderr = Lazy.force Writer.stderr in
-    let module Standard_fd = struct
-      let stdin = Core_unix.File_descr.of_int 0
-      let stdout = Core_unix.File_descr.of_int 1
-      let stderr = Core_unix.File_descr.of_int 2
-    end
-    in
-    assert (same_fd (Fd.file_descr_exn (Reader.fd stdin)) Standard_fd.stdin);
+    assert (same_fd (Fd.file_descr_exn (Reader.fd stdin)) Core_unix.stdin);
     (* Async has a special hack where if file descriptors 1 and 2 happen to point to the
        same file/device (for example when running in a tty) then it only creates one
        writer (ignoring file descriptor 2) that's used for both [Writer.stderr] and
        [Writer.stdout]. In this situation [same_fd] will be false, but [equivalent_fd]
        will be true and that should be enough to keep sanity below. *)
-    assert (equivalent_fd (Fd.file_descr_exn (Writer.fd stdout)) Standard_fd.stdout);
-    assert (equivalent_fd (Fd.file_descr_exn (Writer.fd stderr)) Standard_fd.stderr);
+    assert (equivalent_fd (Fd.file_descr_exn (Writer.fd stdout)) Core_unix.stdout);
+    assert (equivalent_fd (Fd.file_descr_exn (Writer.fd stderr)) Core_unix.stderr);
     let make_a_copy_of_stdin_and_stdout () =
-      let dupped_stdin = Core_unix.dup Standard_fd.stdin in
+      let dupped_stdin = Core_unix.dup Core_unix.stdin in
       Core_unix.set_close_on_exec dupped_stdin;
-      let dupped_stdout = Core_unix.dup Standard_fd.stdout in
+      let dupped_stdout = Core_unix.dup Core_unix.stdout in
       Core_unix.set_close_on_exec dupped_stdout;
       assert (Core_unix.File_descr.to_int dupped_stdin > 2);
       assert (Core_unix.File_descr.to_int dupped_stdout > 2);
@@ -201,8 +195,10 @@ module Command = struct
       (* After this, anyone attempting to read from stdin gets an empty result
          and anything written to stdout goes to stderr instead. *)
       let dev_null = Core_unix.openfile ~mode:[ O_RDONLY ] "/dev/null" in
-      Core_unix.dup2 ~src:dev_null ~dst:Standard_fd.stdin ();
-      Core_unix.dup2 ~src:Standard_fd.stderr ~dst:Standard_fd.stdout ();
+      Async.Fd.expect_file_descr_redirection Core_unix.stdin ~f:(fun () ->
+        Core_unix.dup2 ~src:dev_null ~dst:Core_unix.stdin ());
+      Async.Fd.expect_file_descr_redirection Core_unix.stdout ~f:(fun () ->
+        Core_unix.dup2 ~src:Core_unix.stderr ~dst:Core_unix.stdout ());
       Core_unix.close dev_null
     in
     let res = make_a_copy_of_stdin_and_stdout () in
