@@ -63,7 +63,7 @@ let%expect_test "client is too far behind" =
     (raised (
       (rpc_error (Unimplemented_rpc heartbeat-state (Version 0)))
       (connection_description <created-directly>)
-      (rpc_tag                heartbeat-state)
+      (rpc_name               heartbeat-state)
       (rpc_version            0))) |}];
   return ()
 ;;
@@ -75,7 +75,7 @@ let%expect_test "client is ahead" =
     (raised (
       (rpc_error (Unimplemented_rpc heartbeat-state (Version 3)))
       (connection_description <created-directly>)
-      (rpc_tag                heartbeat-state)
+      (rpc_name               heartbeat-state)
       (rpc_version            3))) |}];
   return ()
 ;;

@@ -64,7 +64,7 @@ let%expect_test _ =
       Error (
         (rpc_error (Unimplemented_rpc caller_rpc (Version 1)))
         (connection_description <created-directly>)
-        (rpc_tag                caller_rpc)
+        (rpc_name               caller_rpc)
         (rpc_version            1)))) |}];
   (* Note that the error is on the *caller* side. *)
   let%bind () = test (`Bin_io (null_implementations ~on_unknown_rpc:`Close_connection)) in
@@ -73,7 +73,7 @@ let%expect_test _ =
     (Error (
       (rpc_error (Connection_closed ("Rpc message handling loop stopped")))
       (connection_description <created-directly>)
-      (rpc_tag                callee_rpc)
+      (rpc_name               callee_rpc)
       (rpc_version            1))) |}];
   (* Note that the error is on the *caller* side. *)
   let%bind () = test (`Bin_io (null_implementations ~on_unknown_rpc:`Raise)) in
@@ -88,7 +88,7 @@ let%expect_test _ =
             <created-directly>)
           ("<backtrace elided in test>" "Caught by monitor RPC connection loop"))))
       (connection_description <created-directly>)
-      (rpc_tag                callee_rpc)
+      (rpc_name               callee_rpc)
       (rpc_version            1))) |}];
   return ()
 ;;
