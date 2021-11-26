@@ -1,4 +1,4 @@
 (executables (names main)
- (libraries async core_kernel.core command_rpc command_rpc_test_protocol
-  core.command_unix)
+ (libraries async core command_rpc command_rpc_test_protocol
+  core_unix.command_unix)
  (preprocess (pps ppx_jane)))
