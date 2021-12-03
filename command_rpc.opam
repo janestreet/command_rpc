@@ -12,9 +12,9 @@ build: [
 depends: [
   "ocaml" {>= "4.08.0"}
   "async"
-  "core_kernel"
+  "core"
   "ppx_jane"
-  "dune"        {>= "2.0.0"}
+  "dune"     {>= "2.0.0"}
 ]
 synopsis: "Utilities for Versioned RPC communication with a child process over stdin and stdout"
 description: "
