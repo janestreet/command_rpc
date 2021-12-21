@@ -177,10 +177,9 @@ module type Command_rpc = sig
             -> ?working_dir:string
             -> unit
             -> Process.t Deferred.Or_error.t)
-      -> ?working_dir:
-           string
-      (* defaults to [Process.create]. You may want to use [process_create] to run
-         Command_rpc on binaries from Exe_server. *)
+      -> (* [process_create] defaults to [Process.create]. You may want to use it to run
+            Command_rpc on binaries from Exe_server. *)
+      ?working_dir:string
       -> prog:string
       -> args:string list
       -> 'a
