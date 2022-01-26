@@ -28,6 +28,14 @@ let pipe_conv_command =
          ])
 ;;
 
+let exit_zero_rpc_command =
+  Command.async
+    ~summary:""
+    (let%map_open.Command () = return ()
+     and serve = Command_rpc.Command.Expert.param () in
+     fun () -> serve [ `Plain (module Command_rpc_test_protocol.Exit_zero_rpc) ])
+;;
+
 let pipe_direct_command =
   Command.async
     ~summary:""
@@ -87,6 +95,7 @@ let () =
   Command.group
     ~summary:""
     [ "caller-implementations", caller_implementations_command
+    ; "exit-zero-rpc", exit_zero_rpc_command
     ; "pipe-conv", pipe_conv_command
     ; "pipe-direct", pipe_direct_command
     ; "logged-to-stderr", logged_to_stderr_command

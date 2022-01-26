@@ -3,6 +3,38 @@ open Poly
 open Async
 open Command_rpc_intf
 
+module Default_timeouts = struct
+  (* Here we greatly increase the default timeouts that we inherit from Async_rpc.
+     The reason it makes sense to have larger defaults here are:
+     - it's common to use [Command_rpc] to offload slow computations to the child process,
+       so long async cycles in the child are more likely, which makes spurious timeout
+       more likely;
+     - command_rpc timeouts are almost always fatal for the application, while it's
+       somewhat-common to have retries or fallbacks for network services;
+     - command_rpc commands are often started from NFS, or compiled on the first start,
+       and we've seen that take some tens of second occasionally.
+
+     The reason the parent timeouts are shorter than child timeouts is that errors
+     detected in the parent have a simpler error handling story.
+  *)
+  let default_handshake_timeout ~side =
+    match side with
+    | `parent -> Time.Span.of_min 10.
+    | `child -> Time.Span.of_hr 1.
+  ;;
+
+  let default_heartbeat_config ~side =
+    Rpc.Connection.Heartbeat_config.create
+      ~timeout:
+        (Time_ns.Span.of_span_float_round_nearest_microsecond
+           (default_handshake_timeout ~side))
+      ~send_every:(Time_ns.Span.of_sec 10.)
+      ()
+  ;;
+end
+
+open Default_timeouts
+
 module Command = struct
   module Invocation = struct
     type t =
@@ -208,8 +240,8 @@ module Command = struct
 
   let main
         ?connection_description
-        ?handshake_timeout
-        ?heartbeat_config
+        ?(handshake_timeout = default_handshake_timeout ~side:`child)
+        ?(heartbeat_config = default_heartbeat_config ~side:`child)
         ?max_message_size
         ?log_not_previously_seen_version
         ?buffer_age_limit
@@ -243,8 +275,8 @@ module Command = struct
              stdin
              stdout
              ?description:connection_description
-             ?handshake_timeout
-             ?heartbeat_config
+             ~handshake_timeout
+             ~heartbeat_config
              ?max_message_size
              ~implementations
              ~connection_state:(fun conn -> Bin_io conn)
@@ -523,8 +555,8 @@ module Connection = struct
   let create
         ?wait_for_stderr_transfer
         ?connection_description
-        ?handshake_timeout
-        ?heartbeat_config
+        ?(handshake_timeout = default_handshake_timeout ~side:`parent)
+        ?(heartbeat_config = default_heartbeat_config ~side:`parent)
         ?max_message_size
         ?implementations
         ?(propagate_stderr = true)
@@ -548,8 +580,8 @@ module Connection = struct
            (Process.stdout process)
            (Process.stdin process)
            ?description:connection_description
-           ?handshake_timeout
-           ?heartbeat_config
+           ~handshake_timeout
+           ~heartbeat_config
            ?max_message_size
            ?implementations
            ~connection_state:(fun _ -> ())
