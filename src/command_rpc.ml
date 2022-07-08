@@ -19,8 +19,8 @@ module Default_timeouts = struct
   *)
   let default_handshake_timeout ~side =
     match side with
-    | `parent -> Time.Span.of_min 10.
-    | `child -> Time.Span.of_hr 1.
+    | `parent -> Time_float.Span.of_min 10.
+    | `child -> Time_float.Span.of_hr 1.
   ;;
 
   let default_heartbeat_config ~side =
@@ -238,6 +238,19 @@ module Command = struct
     res
   ;;
 
+  let use_fds_for_rpc (read_fd, write_fd) =
+    let create_fd name file_descr_no =
+      let file_descr = Core_unix.File_descr.of_int file_descr_no in
+      (* In the common case [read_fd] and [write_fd] originate from being inherited from
+         the parent process, so they will not have CLOEXEC set. *)
+      Core_unix.set_close_on_exec file_descr;
+      Fd.create Fifo file_descr (Info.create "RPC server" name [%sexp_of: string])
+    in
+    let reader = Reader.create (create_fd "rpc-read" read_fd) in
+    let writer = Writer.create (create_fd "rpc-write" write_fd) in
+    reader, writer
+  ;;
+
   let main
         ?connection_description
         ?(handshake_timeout = default_handshake_timeout ~side:`child)
@@ -247,6 +260,7 @@ module Command = struct
         ?buffer_age_limit
         impls
         ~show_menu
+        ?rpc_fds
         mode
     =
     if show_menu
@@ -255,7 +269,11 @@ module Command = struct
       write_sexp (Lazy.force Writer.stdout) menu_sexp;
       return `Success)
     else (
-      let stdin, stdout = claim_stdin_and_stdout_for_exclusive_use ?buffer_age_limit () in
+      let rpc_read, rpc_write =
+        match rpc_fds with
+        | None -> claim_stdin_and_stdout_for_exclusive_use ?buffer_age_limit ()
+        | Some fd_pair -> use_fds_for_rpc fd_pair
+      in
       match mode with
       | `Bin_prot ->
         (match
@@ -272,8 +290,8 @@ module Command = struct
              [%message "duplicate implementations" (descriptions : Rpc.Description.t list)]
          | Ok implementations ->
            Rpc.Connection.server_with_close
-             stdin
-             stdout
+             rpc_read
+             rpc_write
              ?description:connection_description
              ~handshake_timeout
              ~heartbeat_config
@@ -283,7 +301,7 @@ module Command = struct
              ~on_handshake_error:`Raise
            >>| fun () -> `Success)
       | `Sexp ->
-        Reader.read_sexp stdin
+        Reader.read_sexp rpc_read
         >>= (function
           | `Eof -> failwith "unexpected EOF on stdin"
           | `Ok sexp ->
@@ -296,24 +314,24 @@ module Command = struct
                   let query = T.query_of_sexp call.query in
                   T.implementation Sexp query
                   >>| fun response ->
-                  write_sexp stdout (T.sexp_of_response response);
+                  write_sexp rpc_write (T.sexp_of_response response);
                   `Success
                 | `Plain_conv (module T) ->
                   let query = T.query_of_sexp call.query in
                   T.implementation Sexp ~version:call.version query
                   >>| fun response ->
-                  write_sexp stdout (T.sexp_of_response response);
+                  write_sexp rpc_write (T.sexp_of_response response);
                   `Success
                 | `Pipe (module T) ->
                   let query = T.query_of_sexp call.query in
                   T.implementation Sexp query
                   >>= (function
                     | Error e ->
-                      write_sexp stdout (T.sexp_of_error e);
+                      write_sexp rpc_write (T.sexp_of_error e);
                       return `Failure
                     | Ok pipe ->
                       Pipe.iter pipe ~f:(fun r ->
-                        write_sexp stdout (T.sexp_of_response r);
+                        write_sexp rpc_write (T.sexp_of_response r);
                         Deferred.unit)
                       >>| fun () -> `Success)
                 | `Pipe_conv (module T) ->
@@ -321,11 +339,11 @@ module Command = struct
                   T.implementation Sexp ~version:call.version query
                   >>= (function
                     | Error e ->
-                      write_sexp stdout (T.sexp_of_error e);
+                      write_sexp rpc_write (T.sexp_of_error e);
                       return `Failure
                     | Ok pipe ->
                       Pipe.iter pipe ~f:(fun r ->
-                        write_sexp stdout (T.sexp_of_response r);
+                        write_sexp rpc_write (T.sexp_of_response r);
                         Deferred.unit)
                       >>| fun () -> `Success)
                 | `Implementations _ ->
@@ -347,13 +365,27 @@ module Command = struct
 
   let menu_doc = " dump a sexp representation of the rpc menu"
   let sexp_doc = " speak sexp instead of bin-prot"
+  let rpc_read_doc = "FD file-descriptor for RPC input"
+  let rpc_write_doc = "FD file-descriptor for RPC output"
 
   module Expert = struct
     let param_exit_status () =
       let open Command.Let_syntax in
       [%map_open
         let show_menu = flag "-menu" no_arg ~doc:menu_doc
-        and sexp = flag "-sexp" no_arg ~doc:sexp_doc in
+        and sexp, rpc_fds =
+          Command.Param.choose_one
+            [ (let%map_open.Command read_fd =
+                 flag "-rpc-read" (optional int) ~doc:rpc_read_doc
+               and write_fd = flag "-rpc-write" (optional int) ~doc:rpc_write_doc in
+               match read_fd, write_fd with
+               | None, None -> None
+               | Some read_fd, Some write_fd -> Some (false, Some (read_fd, write_fd))
+               | _ -> failwith "Must pass both or none of -rpc-read and -rpc-write")
+            ; flag "-sexp" (no_arg_some (true, None)) ~doc:sexp_doc
+            ]
+            ~if_nothing_chosen:(Default_to (false, None))
+        in
         fun ?connection_description
           ?handshake_timeout
           ?heartbeat_config
@@ -370,6 +402,7 @@ module Command = struct
             ?buffer_age_limit
             impls
             ~show_menu
+            ?rpc_fds
             (if sexp then `Sexp else `Bin_prot)]
     ;;
 
@@ -432,6 +465,16 @@ module Command = struct
 end
 
 module Connection = struct
+  module Stderr_handling = struct
+    type t =
+      | Propagate_stderr
+      | Ignore_stderr
+      | Custom of (Reader.t -> unit Deferred.t)
+    [@@deriving sexp_of]
+
+    let default = Propagate_stderr
+  end
+
   (* We explicitly [Process.wait] as soon as we start our connection. This guarantees the
      subprocess gets cleaned up even if the client does not explicitly wait. *)
   type t =
@@ -445,13 +488,14 @@ module Connection = struct
   let kill t signal = Process.send_signal t.process signal
 
   type 'a with_connection_args =
-    ?wait_for_stderr_transfer:bool
+    ?new_fds_for_rpc:bool
+    -> ?stderr_handling:Stderr_handling.t
+    -> ?wait_for_stderr_transfer:bool
     -> ?connection_description:Info.t
-    -> ?handshake_timeout:Time.Span.t
+    -> ?handshake_timeout:Time_float.Span.t
     -> ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
     -> ?max_message_size:int
     -> ?implementations:unit Rpc.Implementations.t
-    -> ?propagate_stderr:bool (* defaults to true *)
     -> ?env:Process.env (* defaults to [`Extend []] *)
     -> ?process_create:
          (prog:string
@@ -465,58 +509,136 @@ module Connection = struct
     -> args:string list
     -> 'a
 
+  let transfer_stdout child_stdout =
+    Reader.transfer child_stdout (Writer.pipe (Lazy.force Writer.stdout))
+    >>= fun () -> Reader.close child_stdout
+  ;;
+
   let transfer_stderr child_stderr =
     Reader.transfer child_stderr (Writer.pipe (Lazy.force Writer.stderr))
     >>= fun () -> Reader.close child_stderr
   ;;
 
+  let handle_stderr ~(stderr_handling : Stderr_handling.t) stderr =
+    match stderr_handling with
+    | Propagate_stderr -> transfer_stderr stderr
+    | Ignore_stderr -> Reader.drain stderr
+    | Custom f -> f stderr
+  ;;
+
   let connect_gen
-        ?(wait_for_stderr_transfer = false)
+        ?(new_fds_for_rpc = false)
+        ~(stderr_handling : Stderr_handling.t)
+        ~wait_for_stderr_transfer
         ?(process_create =
           fun ~prog ~args ?env ?working_dir () ->
             Process.create ~prog ~args ?env ?working_dir ())
-        ~propagate_stderr
         ~env
         ~prog
         ~args
         ?working_dir
         f
     =
-    process_create ~prog ~args ~env ?working_dir ()
-    >>=? fun process ->
-    let stdin = Process.stdin process in
-    let stdout = Process.stdout process in
-    let stderr = Process.stderr process in
-    let stderr_flushed =
-      if propagate_stderr then transfer_stderr stderr else Reader.drain stderr
-    in
-    if not wait_for_stderr_transfer
-    then
-      (* This is mainly so that when a user closes the connection (which closes stdin and
-         stdout) we will also close stderr. *)
-      don't_wait_for
-        (Writer.close_finished stdin
-         >>= fun () -> Reader.close_finished stdout >>= fun () -> Reader.close stderr);
-    let wait = Process.wait process in
-    let wait =
-      match wait_for_stderr_transfer with
-      | false -> wait
-      | true ->
+    if new_fds_for_rpc
+    then (
+      (match stderr_handling with
+       | Propagate_stderr | Custom (_ : Reader.t -> unit Deferred.t) -> ()
+       | Ignore_stderr ->
+         (* The default for [stderr_handling] (below) is 'Propagate_stderr'.  Because
+            we always propagate stderr here (and stdout), complain if called
+            with anything but 'Propagate_stderr'. *)
+         raise_s
+           [%message
+             "Cannot have 'new_fds_for_rpc' and not propagate stderr"
+               (stderr_handling : Stderr_handling.t)]);
+      (* Create new pipes for RPC. *)
+      let to_sub_r, to_sub_w = Core_unix.pipe ~close_on_exec:true () in
+      let from_sub_r, from_sub_w = Core_unix.pipe ~close_on_exec:true () in
+      let args =
+        args
+        @ [ "-rpc-read"
+          ; Core_unix.File_descr.to_string to_sub_r
+          ; "-rpc-write"
+          ; Core_unix.File_descr.to_string from_sub_w
+          ]
+      in
+      let reproduce_close_on_exec_race = false in
+      Core_unix.clear_close_on_exec to_sub_r;
+      Core_unix.clear_close_on_exec from_sub_w;
+      let%bind.Deferred.Or_error process =
+        process_create ~prog ~args ~env ?working_dir ()
+      in
+      (* Close the descriptors we know we don't need. *)
+      if not reproduce_close_on_exec_race
+      then (
+        Core_unix.close to_sub_r;
+        Core_unix.close from_sub_w);
+      let create_fd name file_descr =
+        Fd.create
+          Fifo
+          file_descr
+          (Info.create "parent process" ~here:[%here] name [%sexp_of: string])
+      in
+      let rpc_read = Reader.create (create_fd "rpc-read" from_sub_r) in
+      let rpc_write = Writer.create (create_fd "rpc-write" to_sub_w) in
+      let stdout = Process.stdout process in
+      let stderr = Process.stderr process in
+      (* Always propagate stdout and stderr from the process. *)
+      let output_flushed =
+        Deferred.all_unit
+          [ handle_stderr ~stderr_handling stderr; transfer_stdout stdout ]
+      in
+      let wait = Process.wait process in
+      let wait =
         let%map wait = wait
-        and () = stderr_flushed in
+        and () = output_flushed in
         wait
-    in
-    f ~process ~wait
+      in
+      let%map res = f ~rpc_read ~rpc_write ~process ~wait in
+      if reproduce_close_on_exec_race
+      then (
+        Core_unix.close to_sub_r;
+        Core_unix.close from_sub_w);
+      res)
+    else
+      process_create ~prog ~args ~env ?working_dir ()
+      >>=? fun process ->
+      let stdin = Process.stdin process in
+      let stdout = Process.stdout process in
+      let stderr = Process.stderr process in
+      let stderr_flushed = handle_stderr ~stderr_handling stderr in
+      if not wait_for_stderr_transfer
+      then
+        (* This is mainly so that when a user closes the connection (which closes stdin and
+           stdout) we will also close stderr. *)
+        don't_wait_for
+          (Writer.close_finished stdin
+           >>= fun () -> Reader.close_finished stdout >>= fun () -> Reader.close stderr);
+      let wait = Process.wait process in
+      let wait =
+        match wait_for_stderr_transfer with
+        | false -> wait
+        | true ->
+          let%map wait = wait
+          and () = stderr_flushed in
+          wait
+      in
+      f
+        ~rpc_read:(Process.stdout process)
+        ~rpc_write:(Process.stdin process)
+        ~process
+        ~wait
   ;;
 
   let with_close
-        ?wait_for_stderr_transfer
+        ?new_fds_for_rpc
+        ?(stderr_handling = Stderr_handling.default)
+        ?(wait_for_stderr_transfer = true)
         ?connection_description
         ?handshake_timeout
         ?heartbeat_config
         ?max_message_size
         ?implementations
-        ?(propagate_stderr = true)
         ?(env = `Extend [])
         ?process_create
         ?working_dir
@@ -525,18 +647,19 @@ module Connection = struct
         dispatch_queries
     =
     connect_gen
-      ?wait_for_stderr_transfer
+      ?new_fds_for_rpc
+      ~wait_for_stderr_transfer
+      ~stderr_handling
       ?process_create
-      ~propagate_stderr
       ~env
       ~prog
       ~args
       ?working_dir
-      (fun ~process ~wait ->
+      (fun ~rpc_read ~rpc_write ~process ~wait ->
          let%bind result =
            Rpc.Connection.with_close
-             (Process.stdout process)
-             (Process.stdin process)
+             rpc_read
+             rpc_write
              ?description:connection_description
              ?handshake_timeout
              ?heartbeat_config
@@ -553,13 +676,14 @@ module Connection = struct
   ;;
 
   let create
-        ?wait_for_stderr_transfer
+        ?new_fds_for_rpc
+        ?(stderr_handling = Stderr_handling.default)
+        ?(wait_for_stderr_transfer = true)
         ?connection_description
         ?(handshake_timeout = default_handshake_timeout ~side:`parent)
         ?(heartbeat_config = default_heartbeat_config ~side:`parent)
         ?max_message_size
         ?implementations
-        ?(propagate_stderr = true)
         ?(env = `Extend [])
         ?process_create
         ?working_dir
@@ -568,17 +692,18 @@ module Connection = struct
         ()
     =
     connect_gen
-      ?wait_for_stderr_transfer
+      ?new_fds_for_rpc
+      ~stderr_handling
+      ~wait_for_stderr_transfer
       ?process_create
-      ~propagate_stderr
       ~env
       ~prog
       ~args
       ?working_dir
-      (fun ~process ~wait ->
+      (fun ~rpc_read ~rpc_write ~process ~wait ->
          Rpc.Connection.create
-           (Process.stdout process)
-           (Process.stdin process)
+           rpc_read
+           rpc_write
            ?description:connection_description
            ~handshake_timeout
            ~heartbeat_config

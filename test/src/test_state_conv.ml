@@ -10,7 +10,7 @@ module Versions = struct
     }
 end
 
-let test (versions : Versions.t) =
+let test new_fds_for_rpc (versions : Versions.t) =
   let n = 3 in
   let get_all_responses conn =
     let rpc =
@@ -29,6 +29,8 @@ let test (versions : Versions.t) =
   let%bind result =
     Command_rpc.Connection.with_close
       get_all_responses
+      ~new_fds_for_rpc
+      ~wait_for_stderr_transfer:false
       ~prog:"../bin/main.exe"
       ~args:
         ([ [ "state-conv" ]
@@ -43,23 +45,33 @@ let test (versions : Versions.t) =
 ;;
 
 let%expect_test "client is up to date" =
-  let%bind () = test { client = 2; server_min = 1; server_max = 2 } in
+  let%bind () = test false { client = 2; server_min = 1; server_max = 2 } in
+  let%bind () = test true { client = 2; server_min = 1; server_max = 2 } in
   [%expect {|
+    "did not raise"
     "did not raise" |}];
   return ()
 ;;
 
 let%expect_test "client is acceptably behind" =
-  let%bind () = test { client = 1; server_min = 1; server_max = 2 } in
+  let%bind () = test false { client = 1; server_min = 1; server_max = 2 } in
+  let%bind () = test true { client = 1; server_min = 1; server_max = 2 } in
   [%expect {|
+    "did not raise"
     "did not raise" |}];
   return ()
 ;;
 
 let%expect_test "client is too far behind" =
-  let%bind () = test { client = 0; server_min = 1; server_max = 2 } in
+  let%bind () = test false { client = 0; server_min = 1; server_max = 2 } in
+  let%bind () = test true { client = 0; server_min = 1; server_max = 2 } in
   [%expect
     {|
+    (raised (
+      (rpc_error (Unimplemented_rpc heartbeat-state (Version 0)))
+      (connection_description <created-directly>)
+      (rpc_name               heartbeat-state)
+      (rpc_version            0)))
     (raised (
       (rpc_error (Unimplemented_rpc heartbeat-state (Version 0)))
       (connection_description <created-directly>)
@@ -69,9 +81,15 @@ let%expect_test "client is too far behind" =
 ;;
 
 let%expect_test "client is ahead" =
-  let%bind () = test { client = 3; server_min = 1; server_max = 2 } in
+  let%bind () = test false { client = 3; server_min = 1; server_max = 2 } in
+  let%bind () = test true { client = 3; server_min = 1; server_max = 2 } in
   [%expect
     {|
+    (raised (
+      (rpc_error (Unimplemented_rpc heartbeat-state (Version 3)))
+      (connection_description <created-directly>)
+      (rpc_name               heartbeat-state)
+      (rpc_version            3)))
     (raised (
       (rpc_error (Unimplemented_rpc heartbeat-state (Version 3)))
       (connection_description <created-directly>)

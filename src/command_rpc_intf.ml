@@ -115,7 +115,7 @@ module type Command_rpc = sig
 
     val create
       :  ?connection_description:Info.t
-      -> ?handshake_timeout:Time.Span.t
+      -> ?handshake_timeout:Time_float.Span.t
       -> ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
       -> ?max_message_size:int
       -> ?log_not_previously_seen_version:(name:string -> int -> unit)
@@ -142,7 +142,7 @@ module type Command_rpc = sig
       val param
         :  unit
         -> (?connection_description:Info.t
-            -> ?handshake_timeout:Time.Span.t
+            -> ?handshake_timeout:Time_float.Span.t
             -> ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
             -> ?max_message_size:int
             -> ?log_not_previously_seen_version:(name:string -> int -> unit)
@@ -155,20 +155,30 @@ module type Command_rpc = sig
   end
 
   module Connection : sig
+    module Stderr_handling : sig
+      type t =
+        | Propagate_stderr
+        | Ignore_stderr
+        | Custom of (Reader.t -> unit Deferred.t)
+
+      (** [Propagate_stderr] *)
+      val default : t
+    end
+
     type t
 
     type 'a with_connection_args =
-      ?wait_for_stderr_transfer:
-        bool
-      (* Defaults to [false]. If set to true, makes
-         [with_close] and [Expert.wait] wait for stderr to have been
-         fully propagated (or drained). *)
+      ?new_fds_for_rpc:bool
+      -> ?stderr_handling:Stderr_handling.t (** default: [Stderr_handling.default] *)
+      -> ?wait_for_stderr_transfer:bool
+      (** Defaults to [true]. If set to true, makes [with_close] and [Expert.wait] wait
+          for stderr to have been fully propagated, fully drained, or for the user
+          callback (in the case of [stderr_handling = Custom _]) to complete. *)
       -> ?connection_description:Info.t
-      -> ?handshake_timeout:Time.Span.t
+      -> ?handshake_timeout:Time_float.Span.t
       -> ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
       -> ?max_message_size:int
       -> ?implementations:unit Rpc.Implementations.t
-      -> ?propagate_stderr:bool (* defaults to true *)
       -> ?env:Process.env (* defaults to [`Extend []] *)
       -> ?process_create:
            (prog:string
