@@ -73,6 +73,7 @@ module type Command_rpc = sig
       type t =
         | Sexp
         | Bin_io of Rpc.Connection.t
+      [@@deriving sexp_of]
     end
 
     module Stateful : sig

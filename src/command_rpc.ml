@@ -40,6 +40,7 @@ module Command = struct
     type t =
       | Sexp
       | Bin_io of Rpc.Connection.t
+    [@@deriving sexp_of]
   end
 
   module Stateful = struct
