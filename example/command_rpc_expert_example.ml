@@ -44,7 +44,9 @@ let callee_command =
               ~f:(fun (_ : Command_rpc.Command.Invocation.t) -> state))
         in
         main (Command_rpc.Command.stateful rpcs)]
+    ~behave_nicely_in_pipeline:false
 ;;
+
 
 let caller_command =
   let open Command.Let_syntax in
@@ -65,7 +67,9 @@ let caller_command =
              let%bind sum = Rpc.Rpc.dispatch Get_sum.rpc rpc_connection () in
              printf "%d\n" sum;
              return ())]
+    ~behave_nicely_in_pipeline:false
 ;;
+
 
 let command =
   Command.group

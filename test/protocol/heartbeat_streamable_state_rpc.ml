@@ -131,7 +131,7 @@ let server ~min_version ~max_version =
       done
     ;;
 
-    let implementation _invocation n =
+    let implementation _invocation ~version:_ n =
       return (Ok ((), Pipe.of_list (List.init n ~f:(const ()))))
     ;;
   end

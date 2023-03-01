@@ -172,7 +172,9 @@ let caller_command =
           >>=? fun connection_with_menu ->
           Protocol.dispatch_multi connection_with_menu (x, y)
           >>|? fun result -> printf "result: %d\n" result)]
+    ~behave_nicely_in_pipeline:false
 ;;
+
 
 let custom_process_create =
   let open Command.Let_syntax in
@@ -194,7 +196,9 @@ let custom_process_create =
           >>=? fun connection_with_menu ->
           Protocol.dispatch_multi connection_with_menu (10, 1)
           >>|? fun result -> printf "result: %d\n" result)]
+    ~behave_nicely_in_pipeline:false
 ;;
+
 
 let () =
   let command =

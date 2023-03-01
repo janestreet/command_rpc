@@ -212,17 +212,17 @@ module type Command_rpc = sig
     (** Get the RPC connection needed to talk to the command-rpc executable. *)
     val rpc_connection : t -> Rpc.Connection.t
 
-    (** This module exists for testing purposes only. For example, clients can test
-        whether their command-rpc server cleans up after itself properly when a ctrl-c
-        at the command line kills a whole process group, server included. *)
+    (** This module contains some functions that let you interact with the underlying
+        child process. There's nothing particularly tricky about them, but most users
+        don't need them. *)
     module Expert : sig
-      (** Send a signal to the command-rpc executable.
-
-          Note that this has a (very small) race condition where we can send a signal
-          to a reaped pid if the process dies at exactly the right time. *)
+      (** Send a signal to the command-rpc executable. *)
       val kill : t -> Signal.t -> unit
 
-      (** Wait for termination of the command-rpc executable. *)
+      (** Wait for termination of the command-rpc executable and return
+          the exit status.
+          This can be used e.g. after [with_close] to collect the missing info, since
+          [with_close] does not report it. *)
       val wait : t -> Unix.Exit_or_signal.t Deferred.t
     end
   end

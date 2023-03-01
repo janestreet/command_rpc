@@ -40,7 +40,7 @@ let%expect_test "propagate stderr" =
 let%expect_test "transfer to pipe" =
   let test n =
     let%map results =
-      Deferred.List.map [%all: bool] ~f:(fun new_fds_for_rpc ->
+      Deferred.List.map ~how:`Sequential [%all: bool] ~f:(fun new_fds_for_rpc ->
         let result = Set_once.create () in
         let f reader = Reader.contents reader >>| Set_once.set_exn result [%here] in
         let%map () = test (Custom f) new_fds_for_rpc n in
