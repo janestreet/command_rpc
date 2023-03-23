@@ -288,7 +288,8 @@ module Command = struct
          with
          | Error (`Duplicate_implementations descriptions) ->
            raise_s
-             [%message "duplicate implementations" (descriptions : Rpc.Description.t list)]
+             [%message
+               "duplicate implementations" (descriptions : Rpc.Description.t list)]
          | Ok implementations ->
            Rpc.Connection.server_with_close
              rpc_read
@@ -410,30 +411,31 @@ module Command = struct
     let param () =
       Command.Param.map
         (param_exit_status ())
-        ~f:(fun
-             main
-             ?connection_description
-             ?handshake_timeout
-             ?heartbeat_config
-             ?max_message_size
-             ?log_not_previously_seen_version
-             ?buffer_age_limit
-             rpcs
-             ->
-               (* If you want to detect success or failure and do something appropriate,
-                  you can just do that from your RPC implementation. But we still need
-                  [param_exit_status] separately because [create] below doesn't have
-                  access to the RPC implementations. *)
-               main
-                 ?connection_description
-                 ?handshake_timeout
-                 ?heartbeat_config
-                 ?max_message_size
-                 ?log_not_previously_seen_version
-                 ?buffer_age_limit
-                 rpcs
-               >>| function
-               | `Success | `Failure -> ())
+        ~f:
+          (fun
+            main
+            ?connection_description
+            ?handshake_timeout
+            ?heartbeat_config
+            ?max_message_size
+            ?log_not_previously_seen_version
+            ?buffer_age_limit
+            rpcs
+            ->
+              (* If you want to detect success or failure and do something appropriate,
+                 you can just do that from your RPC implementation. But we still need
+                 [param_exit_status] separately because [create] below doesn't have
+                 access to the RPC implementations. *)
+              main
+                ?connection_description
+                ?handshake_timeout
+                ?heartbeat_config
+                ?max_message_size
+                ?log_not_previously_seen_version
+                ?buffer_age_limit
+                rpcs
+              >>| function
+              | `Success | `Failure -> ())
     ;;
   end
 
