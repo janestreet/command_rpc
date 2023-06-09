@@ -13,7 +13,9 @@ let test new_fds_for_rpc num_heartbeats =
         num_heartbeats
       |> Deferred.map ~f:Or_error.join
     in
-    let%map num_responses = Pipe.to_list responses |> Deferred.ok >>| List.length in
+    let%map num_responses =
+      Pipe.to_list responses |> Deferred.ok >>| (List.length :> _ -> _)
+    in
     print_s [%sexp (num_responses : int)]
   in
   Command_rpc.Connection.with_close
