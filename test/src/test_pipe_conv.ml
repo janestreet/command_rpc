@@ -79,14 +79,22 @@ let%expect_test "client is too far behind" =
     {|
     (raised (
       (rpc_error (Unimplemented_rpc heartbeat (Version 0)))
-      (connection_description <created-directly>)
-      (rpc_name               heartbeat)
-      (rpc_version            0)))
+      (connection_description (
+        "Command_rpc client (parent process)"
+        (prog      <hidden_in_test>)
+        (args      <hidden_in_test>)
+        (child_pid <hidden_in_test>)))
+      (rpc_name    heartbeat)
+      (rpc_version 0)))
     (raised (
       (rpc_error (Unimplemented_rpc heartbeat (Version 0)))
-      (connection_description <created-directly>)
-      (rpc_name               heartbeat)
-      (rpc_version            0))) |}];
+      (connection_description (
+        "Command_rpc client (parent process)"
+        (prog      <hidden_in_test>)
+        (args      <hidden_in_test>)
+        (child_pid <hidden_in_test>)))
+      (rpc_name    heartbeat)
+      (rpc_version 0))) |}];
   return ()
 ;;
 
@@ -97,13 +105,21 @@ let%expect_test "client is ahead" =
     {|
     (raised (
       (rpc_error (Unimplemented_rpc heartbeat (Version 3)))
-      (connection_description <created-directly>)
-      (rpc_name               heartbeat)
-      (rpc_version            3)))
+      (connection_description (
+        "Command_rpc client (parent process)"
+        (prog      <hidden_in_test>)
+        (args      <hidden_in_test>)
+        (child_pid <hidden_in_test>)))
+      (rpc_name    heartbeat)
+      (rpc_version 3)))
     (raised (
       (rpc_error (Unimplemented_rpc heartbeat (Version 3)))
-      (connection_description <created-directly>)
-      (rpc_name               heartbeat)
-      (rpc_version            3))) |}];
+      (connection_description (
+        "Command_rpc client (parent process)"
+        (prog      <hidden_in_test>)
+        (args      <hidden_in_test>)
+        (child_pid <hidden_in_test>)))
+      (rpc_name    heartbeat)
+      (rpc_version 3))) |}];
   return ()
 ;;

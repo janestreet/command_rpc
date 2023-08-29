@@ -16,7 +16,12 @@ let%expect_test _ =
   [%expect
     {|
     (Error (
-      connection.ml.Handshake_error.Handshake_error (Eof <created-directly>))) |}];
+      connection.ml.Handshake_error.Handshake_error
+      (Eof (
+        "Command_rpc client (parent process)"
+        (prog      <hidden_in_test>)
+        (args      <hidden_in_test>)
+        (child_pid <hidden_in_test>))))) |}];
   return ()
 ;;
 
@@ -45,8 +50,12 @@ let%expect_test _ =
     {|
     (Error (
       (rpc_error (Connection_closed _))
-      (connection_description <created-directly>)
-      (rpc_name               exit_zero)
-      (rpc_version            1))) |}];
+      (connection_description (
+        "Command_rpc client (parent process)"
+        (prog      <hidden_in_test>)
+        (args      <hidden_in_test>)
+        (child_pid <hidden_in_test>)))
+      (rpc_name    exit_zero)
+      (rpc_version 1))) |}];
   return ()
 ;;

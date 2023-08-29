@@ -252,6 +252,16 @@ module Command = struct
     reader, writer
   ;;
 
+  let default_connection_description =
+    Info.of_lazy_sexp
+      (lazy
+        [%message
+          "Command_rpc server (child process)"
+            ~executable:(Sys.executable_name : string Sexp_hidden_in_test.t)
+            ~pid:(Unix.getpid () : Pid.t Sexp_hidden_in_test.t)
+            ~parent_pid:(Unix.getppid () : Pid.t option Sexp_hidden_in_test.t)])
+  ;;
+
   let main
         ?connection_description
         ?(handshake_timeout = default_handshake_timeout ~side:`child)
@@ -291,10 +301,15 @@ module Command = struct
              [%message
                "duplicate implementations" (descriptions : Rpc.Description.t list)]
          | Ok implementations ->
+           let description =
+             match connection_description with
+             | Some description -> description
+             | None -> default_connection_description
+           in
            Rpc.Connection.server_with_close
              rpc_read
              rpc_write
-             ?description:connection_description
+             ~description
              ~handshake_timeout
              ~heartbeat_config
              ?max_message_size
@@ -633,6 +648,23 @@ module Connection = struct
         ~wait
   ;;
 
+  let default_connection_description ~prog ~args ~process =
+    let child_pid = Process.pid process in
+    Info.of_lazy_sexp
+      (lazy
+        [%message
+          "Command_rpc client (parent process)"
+            (prog : string Sexp_hidden_in_test.t)
+            (args : string list Sexp_hidden_in_test.t)
+            (child_pid : Pid.t Sexp_hidden_in_test.t)])
+  ;;
+
+  let get_connection_description ~connection_description ~prog ~args ~process =
+    match connection_description with
+    | Some description -> description
+    | None -> default_connection_description ~prog ~args ~process
+  ;;
+
   let with_close
         ?new_fds_for_rpc
         ?(stderr_handling = Stderr_handling.default)
@@ -663,7 +695,8 @@ module Connection = struct
            Rpc.Connection.with_close
              rpc_read
              rpc_write
-             ?description:connection_description
+             ~description:
+               (get_connection_description ~connection_description ~prog ~args ~process)
              ?handshake_timeout
              ?heartbeat_config
              ?max_message_size
@@ -707,7 +740,8 @@ module Connection = struct
          Rpc.Connection.create
            rpc_read
            rpc_write
-           ?description:connection_description
+           ~description:
+             (get_connection_description ~connection_description ~prog ~args ~process)
            ~handshake_timeout
            ~heartbeat_config
            ?max_message_size

@@ -80,15 +80,23 @@ let%expect_test _ =
     (Ok (
       Error (
         (rpc_error (Unimplemented_rpc caller_rpc (Version 1)))
-        (connection_description <created-directly>)
-        (rpc_name               caller_rpc)
-        (rpc_version            1))))
+        (connection_description (
+          "Command_rpc server (child process)"
+          (executable <hidden_in_test>)
+          (pid        <hidden_in_test>)
+          (parent_pid <hidden_in_test>)))
+        (rpc_name    caller_rpc)
+        (rpc_version 1))))
     (Ok (
       Error (
         (rpc_error (Unimplemented_rpc caller_rpc (Version 1)))
-        (connection_description <created-directly>)
-        (rpc_name               caller_rpc)
-        (rpc_version            1)))) |}];
+        (connection_description (
+          "Command_rpc server (child process)"
+          (executable <hidden_in_test>)
+          (pid        <hidden_in_test>)
+          (parent_pid <hidden_in_test>)))
+        (rpc_name    caller_rpc)
+        (rpc_version 1)))) |}];
   (* Note that the error is on the *caller* side. *)
   let%bind () =
     test false (`Bin_io (null_implementations ~on_unknown_rpc:`Close_connection))
@@ -100,14 +108,22 @@ let%expect_test _ =
     {|
     (Error (
       (rpc_error (Connection_closed ("Rpc message handling loop stopped")))
-      (connection_description <created-directly>)
-      (rpc_name               callee_rpc)
-      (rpc_version            1)))
+      (connection_description (
+        "Command_rpc client (parent process)"
+        (prog      <hidden_in_test>)
+        (args      <hidden_in_test>)
+        (child_pid <hidden_in_test>)))
+      (rpc_name    callee_rpc)
+      (rpc_version 1)))
     (Error (
       (rpc_error (Connection_closed ("Rpc message handling loop stopped")))
-      (connection_description <created-directly>)
-      (rpc_name               callee_rpc)
-      (rpc_version            1))) |}];
+      (connection_description (
+        "Command_rpc client (parent process)"
+        (prog      <hidden_in_test>)
+        (args      <hidden_in_test>)
+        (child_pid <hidden_in_test>)))
+      (rpc_name    callee_rpc)
+      (rpc_version 1))) |}];
   (* Note that the error is on the *caller* side. *)
   let%bind () = test false (`Bin_io (null_implementations ~on_unknown_rpc:`Raise)) in
   let%bind () = test true (`Bin_io (null_implementations ~on_unknown_rpc:`Raise)) in
@@ -119,21 +135,35 @@ let%expect_test _ =
           monitor.ml.Error
           (rpc_error.ml.Rpc
             (Unimplemented_rpc caller_rpc (Version 1))
-            <created-directly>)
+            ("Command_rpc client (parent process)"
+              (prog      <hidden_in_test>)
+              (args      <hidden_in_test>)
+              (child_pid <hidden_in_test>)))
           ("<backtrace elided in test>" "Caught by monitor RPC connection loop"))))
-      (connection_description <created-directly>)
-      (rpc_name               callee_rpc)
-      (rpc_version            1)))
+      (connection_description (
+        "Command_rpc client (parent process)"
+        (prog      <hidden_in_test>)
+        (args      <hidden_in_test>)
+        (child_pid <hidden_in_test>)))
+      (rpc_name    callee_rpc)
+      (rpc_version 1)))
     (Error (
       (rpc_error (
         Uncaught_exn (
           monitor.ml.Error
           (rpc_error.ml.Rpc
             (Unimplemented_rpc caller_rpc (Version 1))
-            <created-directly>)
+            ("Command_rpc client (parent process)"
+              (prog      <hidden_in_test>)
+              (args      <hidden_in_test>)
+              (child_pid <hidden_in_test>)))
           ("<backtrace elided in test>" "Caught by monitor RPC connection loop"))))
-      (connection_description <created-directly>)
-      (rpc_name               callee_rpc)
-      (rpc_version            1))) |}];
+      (connection_description (
+        "Command_rpc client (parent process)"
+        (prog      <hidden_in_test>)
+        (args      <hidden_in_test>)
+        (child_pid <hidden_in_test>)))
+      (rpc_name    callee_rpc)
+      (rpc_version 1))) |}];
   return ()
 ;;
