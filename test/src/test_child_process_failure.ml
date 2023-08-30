@@ -28,10 +28,10 @@ let%expect_test _ =
 let test_exit_zero () =
   Command_rpc.Connection.with_close
     (fun conn ->
-       Rpc.Rpc.dispatch
-         Command_rpc_test_protocol.Exit_zero_rpc.rpc
-         (Command_rpc.Connection.rpc_connection conn)
-         ())
+      Rpc.Rpc.dispatch
+        Command_rpc_test_protocol.Exit_zero_rpc.rpc
+        (Command_rpc.Connection.rpc_connection conn)
+        ())
     ~wait_for_stderr_transfer:false
     ~prog:"../bin/main.exe"
     ~args:[ "exit-zero" ]

@@ -12,7 +12,6 @@ let caller_implementations_command =
     ~behave_nicely_in_pipeline:false
 ;;
 
-
 let pipe_conv_command =
   Command.async
     ~summary:""
@@ -26,11 +25,10 @@ let pipe_conv_command =
              (Command_rpc_test_protocol.Heartbeat_pipe_rpc.server
                 ~min_version
                 ~max_version
-              :> (module Command_rpc.Command.T_pipe_conv))
+               :> (module Command_rpc.Command.T_pipe_conv))
          ])
     ~behave_nicely_in_pipeline:false
 ;;
-
 
 let exit_zero_rpc_command =
   Command.async
@@ -40,7 +38,6 @@ let exit_zero_rpc_command =
      fun () -> serve [ `Plain (module Command_rpc_test_protocol.Exit_zero_rpc) ])
     ~behave_nicely_in_pipeline:false
 ;;
-
 
 let pipe_direct_command =
   Command.async
@@ -55,7 +52,6 @@ let pipe_direct_command =
     ~behave_nicely_in_pipeline:false
 ;;
 
-
 let logged_to_stderr_command =
   Command.async
     ~summary:""
@@ -67,7 +63,6 @@ let logged_to_stderr_command =
          ])
     ~behave_nicely_in_pipeline:false
 ;;
-
 
 let state_conv_command =
   Command.async
@@ -86,7 +81,6 @@ let state_conv_command =
     ~behave_nicely_in_pipeline:false
 ;;
 
-
 let streamable_state_conv_command =
   Command.async
     ~summary:""
@@ -103,7 +97,6 @@ let streamable_state_conv_command =
          ])
     ~behave_nicely_in_pipeline:false
 ;;
-
 
 let () =
   Command.group

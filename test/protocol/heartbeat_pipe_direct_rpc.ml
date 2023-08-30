@@ -14,9 +14,9 @@ let rpc =
 ;;
 
 let implementation
-      (_ : Command_rpc.Command.Invocation.t)
-      num_messages
-      direct_stream_writer
+  (_ : Command_rpc.Command.Invocation.t)
+  num_messages
+  direct_stream_writer
   =
   don't_wait_for
     (let%map () =

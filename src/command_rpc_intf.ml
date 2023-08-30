@@ -45,9 +45,9 @@ module type T_pipe_conv = sig
 
   include
     Versioned_rpc.Callee_converts.Pipe_rpc.S
-    with type query := query
-    with type response := response
-    with type error := error
+      with type query := query
+      with type response := response
+      with type error := error
 
   val implementation
     :  state
@@ -148,10 +148,10 @@ module type Command_rpc = sig
             -> ?max_message_size:int
             -> ?log_not_previously_seen_version:(name:string -> int -> unit)
             -> ?buffer_age_limit:Writer.buffer_age_limit
-            (** Set the buffer age limit of the stdout writer *)
+                 (** Set the buffer age limit of the stdout writer *)
             -> t list
             -> unit Deferred.t)
-             Command.Param.t
+           Command.Param.t
     end
   end
 
@@ -172,7 +172,7 @@ module type Command_rpc = sig
       ?new_fds_for_rpc:bool
       -> ?stderr_handling:Stderr_handling.t (** default: [Stderr_handling.default] *)
       -> ?wait_for_stderr_transfer:bool
-      (** Defaults to [true]. If set to true, makes [with_close] and [Expert.wait] wait
+           (** Defaults to [true]. If set to true, makes [with_close] and [Expert.wait] wait
           for stderr to have been fully propagated, fully drained, or for the user
           callback (in the case of [stderr_handling = Custom _]) to complete. *)
       -> ?connection_description:Info.t
@@ -190,7 +190,7 @@ module type Command_rpc = sig
             -> Process.t Deferred.Or_error.t)
       -> (* [process_create] defaults to [Process.create]. You may want to use it to run
             Command_rpc on binaries from Exe_server. *)
-      ?working_dir:string
+         ?working_dir:string
       -> prog:string
       -> args:string list
       -> 'a
@@ -226,5 +226,4 @@ module type Command_rpc = sig
       val wait : t -> Unix.Exit_or_signal.t Deferred.t
     end
   end
-
 end

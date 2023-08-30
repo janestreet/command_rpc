@@ -56,8 +56,8 @@ module type Register = functor
      val client_pushes_back : bool
    end)
   -> sig
-    val rpc : (Version_i.query, Version_i.state, Version_i.update) Streamable.State_rpc.t
-  end
+  val rpc : (Version_i.query, Version_i.state, Version_i.update) Streamable.State_rpc.t
+end
 
 let register_version (module Register : Register) version =
   let module M =
@@ -94,9 +94,9 @@ module type S_make = sig
 
   include
     Streamable.Versioned_state_rpc.Callee_converts.S
-    with type query := query
-     and type update := update
-     and type state := initial_state
+      with type query := query
+       and type update := update
+       and type state := initial_state
 
   module Register : Register
 end
@@ -108,12 +108,12 @@ let make () =
     type initial_state = unit
 
     include Streamable.Versioned_state_rpc.Callee_converts.Make (struct
-        let name = "heartbeat-streamable-state"
+      let name = "heartbeat-streamable-state"
 
-        type nonrec query = query
-        type nonrec state = initial_state
-        type nonrec update = update
-      end)
+      type nonrec query = query
+      type nonrec state = initial_state
+      type nonrec update = update
+    end)
   end : S_make)
 ;;
 
@@ -127,7 +127,7 @@ let server ~min_version ~max_version =
       for version = min_version to max_version do
         ignore
           (register_version (module Register) version
-           : (query, initial_state, update) Streamable.State_rpc.t)
+            : (query, initial_state, update) Streamable.State_rpc.t)
       done
     ;;
 

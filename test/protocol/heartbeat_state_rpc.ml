@@ -55,13 +55,13 @@ module type Register = functor
      val client_pushes_back : bool
    end)
   -> sig
-    val rpc
-      : ( Version_i.query
-        , Version_i.state
-        , Version_i.update
-        , Version_i.error )
-          Rpc.State_rpc.t
-  end
+  val rpc
+    : ( Version_i.query
+      , Version_i.state
+      , Version_i.update
+      , Version_i.error )
+      Rpc.State_rpc.t
+end
 
 let register_version (module Register : Register) version =
   let module M =
@@ -95,13 +95,13 @@ module Make () = struct
   type error = Error.t
 
   include Versioned_rpc.Callee_converts.State_rpc.Make (struct
-      let name = "heartbeat-state"
+    let name = "heartbeat-state"
 
-      type nonrec query = query
-      type nonrec state = initial_state
-      type nonrec update = update
-      type nonrec error = error
-    end)
+    type nonrec query = query
+    type nonrec state = initial_state
+    type nonrec update = update
+    type nonrec error = error
+  end)
 end
 
 let server ~min_version ~max_version =
@@ -112,7 +112,7 @@ let server ~min_version ~max_version =
     for version = min_version to max_version do
       ignore
         (register_version (module X.Register) version
-         : (X.query, X.initial_state, X.update, X.error) Rpc.State_rpc.t)
+          : (X.query, X.initial_state, X.update, X.error) Rpc.State_rpc.t)
     done
   in
   X.implement_multi (fun _invocation ~version:_ n ->

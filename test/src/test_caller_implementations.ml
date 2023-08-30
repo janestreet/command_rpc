@@ -61,13 +61,13 @@ let%expect_test _ =
     test
       false
       (`Bin_io
-         Command_rpc_test_protocol.Caller_implementations_rpcs.Caller.implementations)
+        Command_rpc_test_protocol.Caller_implementations_rpcs.Caller.implementations)
   in
   let%bind () =
     test
       true
       (`Bin_io
-         Command_rpc_test_protocol.Caller_implementations_rpcs.Caller.implementations)
+        Command_rpc_test_protocol.Caller_implementations_rpcs.Caller.implementations)
   in
   [%expect
     {|

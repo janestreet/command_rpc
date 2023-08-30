@@ -47,7 +47,6 @@ let callee_command =
     ~behave_nicely_in_pipeline:false
 ;;
 
-
 let caller_command =
   let open Command.Let_syntax in
   Command.async_or_error
@@ -61,15 +60,14 @@ let caller_command =
           ~prog:(Sys.get_argv ()).(0)
           ~args:[ "callee" ]
           (fun connection ->
-             let rpc_connection = Command_rpc.Connection.rpc_connection connection in
-             let%bind () = Rpc.Rpc.dispatch Send_summand.rpc rpc_connection a in
-             let%bind () = Rpc.Rpc.dispatch Send_summand.rpc rpc_connection b in
-             let%bind sum = Rpc.Rpc.dispatch Get_sum.rpc rpc_connection () in
-             printf "%d\n" sum;
-             return ())]
+            let rpc_connection = Command_rpc.Connection.rpc_connection connection in
+            let%bind () = Rpc.Rpc.dispatch Send_summand.rpc rpc_connection a in
+            let%bind () = Rpc.Rpc.dispatch Send_summand.rpc rpc_connection b in
+            let%bind sum = Rpc.Rpc.dispatch Get_sum.rpc rpc_connection () in
+            printf "%d\n" sum;
+            return ())]
     ~behave_nicely_in_pipeline:false
 ;;
-
 
 let command =
   Command.group

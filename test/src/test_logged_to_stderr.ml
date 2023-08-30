@@ -4,7 +4,6 @@ open! Import
 
 let _ = Command_rpc_test_protocol.Rpc_logged_to_stderr.rpc_one_way
 
-
 let test stderr_handling new_fds_for_rpc n =
   let dispatch_rpc conn =
     let rpc = Command_rpc_test_protocol.Rpc_logged_to_stderr.rpc in
@@ -54,7 +53,7 @@ let%expect_test "transfer to pipe" =
         (lazy
           [%sexp
             "Differing results based on function inputs. All should be the same:"
-          , (results : (Sexp.t * string) list)])
+            , (results : (Sexp.t * string) list)])
       [%here]
       (Option.is_some result_string);
     Option.iter result_string ~f:print_endline

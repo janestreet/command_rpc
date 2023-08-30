@@ -16,45 +16,45 @@ module V3 = V2
 (* Protocol definition. Used by both caller and callee *)
 module Protocol = struct
   include Versioned_rpc.Caller_converts.Rpc.Make (struct
-      let name = "command-rpc-demo"
+    let name = "command-rpc-demo"
 
-      type query = V3.query
-      type response = V3.response
-    end)
+    type query = V3.query
+    type response = V3.response
+  end)
 
   module V1 = Register (struct
-      let version = 1
+    let version = 1
 
-      type query = int [@@deriving bin_io]
-      type response = int [@@deriving bin_io]
+    type query = int [@@deriving bin_io]
+    type response = int [@@deriving bin_io]
 
-      let query_of_model (x, y) =
-        if x <> 10 then failwith "v1 only supports adding 10";
-        y
-      ;;
+    let query_of_model (x, y) =
+      if x <> 10 then failwith "v1 only supports adding 10";
+      y
+    ;;
 
-      let model_of_response = Fn.id
-    end)
+    let model_of_response = Fn.id
+  end)
 
   module V2 = Register (struct
-      let version = 2
+    let version = 2
 
-      type query = int * int [@@deriving bin_io]
-      type response = int [@@deriving bin_io]
+    type query = int * int [@@deriving bin_io]
+    type response = int [@@deriving bin_io]
 
-      let query_of_model = Fn.id
-      let model_of_response = Fn.id
-    end)
+    let query_of_model = Fn.id
+    let model_of_response = Fn.id
+  end)
 
   module V3 = Register (struct
-      let version = 3
+    let version = 3
 
-      type query = int * int [@@deriving bin_io]
-      type response = int [@@deriving bin_io]
+    type query = int * int [@@deriving bin_io]
+    type response = int [@@deriving bin_io]
 
-      let query_of_model = Fn.id
-      let model_of_response = Fn.id
-    end)
+    let query_of_model = Fn.id
+    let model_of_response = Fn.id
+  end)
 end
 
 (* Callee implementations *)
@@ -175,7 +175,6 @@ let caller_command =
     ~behave_nicely_in_pipeline:false
 ;;
 
-
 let custom_process_create =
   let open Command.Let_syntax in
   Command.async_or_error
@@ -198,7 +197,6 @@ let custom_process_create =
           >>|? fun result -> printf "result: %d\n" result)]
     ~behave_nicely_in_pipeline:false
 ;;
-
 
 let () =
   let command =
