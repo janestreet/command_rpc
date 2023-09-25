@@ -156,6 +156,20 @@ module type Command_rpc = sig
   end
 
   module Connection : sig
+    module Stdout_handling : sig
+      type t =
+        | Default
+            (** semantics depend on [new_fds_for_rpc]. If [new_fds_for_rpc = false], [stdout]
+            is merged with [stderr], and then handled however [stderr] is handled (see
+            [Stderr_handling]). If [new_fds_for_rpc = true], then [stdout] is propagated.
+        *)
+        | Propagate_stdout
+        | Custom of (Reader.t -> unit Deferred.t)
+
+      (** [Default], semantics depend on [new_fds_for_rpc] *)
+      val default : t
+    end
+
     module Stderr_handling : sig
       type t =
         | Propagate_stderr
@@ -170,6 +184,10 @@ module type Command_rpc = sig
 
     type 'a with_connection_args =
       ?new_fds_for_rpc:bool
+        (** Defaults to [false]. If [true], instead of using [stdin] and [stdout] for the
+          RPC connection, new pipes will be created for the connection, and [stdout] from
+          the child process won't be merged with [stderr]. *)
+      -> ?stdout_handling:Stdout_handling.t (** default: [Stdout_handling.default] *)
       -> ?stderr_handling:Stderr_handling.t (** default: [Stderr_handling.default] *)
       -> ?wait_for_stderr_transfer:bool
            (** Defaults to [true]. If set to true, makes [with_close] and [Expert.wait] wait

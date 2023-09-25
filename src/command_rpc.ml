@@ -483,6 +483,16 @@ module Command = struct
 end
 
 module Connection = struct
+  module Stdout_handling = struct
+    type t =
+      | Default
+      | Propagate_stdout
+      | Custom of (Reader.t -> unit Deferred.t)
+    [@@deriving sexp_of]
+
+    let default = Default
+  end
+
   module Stderr_handling = struct
     type t =
       | Propagate_stderr
@@ -507,6 +517,7 @@ module Connection = struct
 
   type 'a with_connection_args =
     ?new_fds_for_rpc:bool
+    -> ?stdout_handling:Stdout_handling.t
     -> ?stderr_handling:Stderr_handling.t
     -> ?wait_for_stderr_transfer:bool
     -> ?connection_description:Info.t
@@ -537,6 +548,12 @@ module Connection = struct
     >>= fun () -> Reader.close child_stderr
   ;;
 
+  let handle_stdout ~(stdout_handling : Stdout_handling.t) stdout =
+    match stdout_handling with
+    | Default | Propagate_stdout -> transfer_stdout stdout
+    | Custom f -> f stdout
+  ;;
+
   let handle_stderr ~(stderr_handling : Stderr_handling.t) stderr =
     match stderr_handling with
     | Propagate_stderr -> transfer_stderr stderr
@@ -546,6 +563,7 @@ module Connection = struct
 
   let connect_gen
     ?(new_fds_for_rpc = false)
+    ~(stdout_handling : Stdout_handling.t)
     ~(stderr_handling : Stderr_handling.t)
     ~wait_for_stderr_transfer
     ?(process_create =
@@ -601,10 +619,10 @@ module Connection = struct
       let rpc_write = Writer.create (create_fd "rpc-write" to_sub_w) in
       let stdout = Process.stdout process in
       let stderr = Process.stderr process in
-      (* Always propagate stdout and stderr from the process. *)
+      (* Potentially propagate stdout and stderr from the process. *)
       let output_flushed =
         Deferred.all_unit
-          [ handle_stderr ~stderr_handling stderr; transfer_stdout stdout ]
+          [ handle_stderr ~stderr_handling stderr; handle_stdout ~stdout_handling stdout ]
       in
       let wait = Process.wait process in
       let wait =
@@ -618,7 +636,21 @@ module Connection = struct
         Core_unix.close to_sub_r;
         Core_unix.close from_sub_w);
       res)
-    else
+    else (
+      (match stdout_handling with
+       | Default -> ()
+       | Propagate_stdout ->
+         raise_s
+           [%message
+             "Must have 'new_fds_for_rpc' to explicitly propagate stdout. Without it, \
+              stderr and stdout are merged, so this option may not behave as one would \
+              expect (actual behavior depends on [stderr_handling])."
+               (stdout_handling : Stdout_handling.t)]
+       | Custom (_ : Reader.t -> unit Deferred.t) ->
+         raise_s
+           [%message
+             "Must have 'new_fds_for_rpc' to specify a custom stdout handling"
+               (stdout_handling : Stdout_handling.t)]);
       process_create ~prog ~args ~env ?working_dir ()
       >>=? fun process ->
       let stdin = Process.stdin process in
@@ -645,7 +677,7 @@ module Connection = struct
         ~rpc_read:(Process.stdout process)
         ~rpc_write:(Process.stdin process)
         ~process
-        ~wait
+        ~wait)
   ;;
 
   let default_connection_description ~prog ~args ~process =
@@ -667,6 +699,7 @@ module Connection = struct
 
   let with_close
     ?new_fds_for_rpc
+    ?(stdout_handling = Stdout_handling.default)
     ?(stderr_handling = Stderr_handling.default)
     ?(wait_for_stderr_transfer = true)
     ?connection_description
@@ -684,6 +717,7 @@ module Connection = struct
     connect_gen
       ?new_fds_for_rpc
       ~wait_for_stderr_transfer
+      ~stdout_handling
       ~stderr_handling
       ?process_create
       ~env
@@ -713,6 +747,7 @@ module Connection = struct
 
   let create
     ?new_fds_for_rpc
+    ?(stdout_handling = Stdout_handling.default)
     ?(stderr_handling = Stderr_handling.default)
     ?(wait_for_stderr_transfer = true)
     ?connection_description
@@ -729,6 +764,7 @@ module Connection = struct
     =
     connect_gen
       ?new_fds_for_rpc
+      ~stdout_handling
       ~stderr_handling
       ~wait_for_stderr_transfer
       ?process_create
