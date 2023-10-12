@@ -2,6 +2,11 @@ open! Core
 open! Async
 open! Import
 
+let fd_count () =
+  let fds = Sys_unix.ls_dir "/proc/self/fd/" in
+  List.length fds
+;;
+
 let test new_fds_for_rpc num_heartbeats =
   let count_heartbeats conn =
     let open Deferred.Or_error.Let_syntax in
@@ -28,17 +33,27 @@ let test new_fds_for_rpc num_heartbeats =
 ;;
 
 let%expect_test _ =
+  let initial_number_of_fds = fd_count () in
   let%bind () = test false 0 in
-  [%expect {| 0 |}];
+  [%expect {|
+    0 |}];
   let%bind () = test false 5 in
-  [%expect {| 5 |}];
+  [%expect {|
+    5 |}];
   let%bind () = test false 100 in
-  [%expect {| 100 |}];
+  [%expect {|
+    100 |}];
   let%bind () = test true 0 in
-  [%expect {| 0 |}];
+  [%expect {|
+    0 |}];
   let%bind () = test true 5 in
-  [%expect {| 5 |}];
+  [%expect {|
+    5 |}];
   let%bind () = test true 100 in
-  [%expect {| 100 |}];
+  [%expect {|
+    100 |}];
+  let final_number_of_fds = fd_count () in
+  print_s [%sexp (final_number_of_fds - initial_number_of_fds : int)];
+  [%expect {| 0 |}];
   return ()
 ;;

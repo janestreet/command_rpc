@@ -617,6 +617,8 @@ module Connection = struct
       in
       let rpc_read = Reader.create (create_fd "rpc-read" from_sub_r) in
       let rpc_write = Writer.create (create_fd "rpc-write" to_sub_w) in
+      let stdin = Process.stdin process in
+      let stdin_closed = Writer.close stdin in
       let stdout = Process.stdout process in
       let stderr = Process.stderr process in
       (* Potentially propagate stdout and stderr from the process. *)
@@ -627,6 +629,7 @@ module Connection = struct
       let wait = Process.wait process in
       let wait =
         let%map wait = wait
+        and () = stdin_closed
         and () = output_flushed in
         wait
       in
