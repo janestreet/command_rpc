@@ -706,8 +706,8 @@ module Connection = struct
     ?(stderr_handling = Stderr_handling.default)
     ?(wait_for_stderr_transfer = true)
     ?connection_description
-    ?handshake_timeout
-    ?heartbeat_config
+    ?(handshake_timeout = default_handshake_timeout ~side:`parent)
+    ?(heartbeat_config = default_heartbeat_config ~side:`parent)
     ?max_message_size
     ?implementations
     ?(env = `Extend [])
@@ -734,8 +734,8 @@ module Connection = struct
           rpc_write
           ~description:
             (get_connection_description ~connection_description ~prog ~args ~process)
-          ?handshake_timeout
-          ?heartbeat_config
+          ~handshake_timeout
+          ~heartbeat_config
           ?max_message_size
           ?implementations
           ~connection_state:(fun _ -> ())
