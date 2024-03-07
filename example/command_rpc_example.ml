@@ -121,6 +121,7 @@ module Spawn_sleep_1000_and_print_its_pid_to_fd_7 = struct
       ~version:1
       ~bin_query
       ~bin_response
+      ~include_in_error_count:Only_on_exn
   ;;
 
   let implementation (_ : Command_rpc.Command.Invocation.t) () =

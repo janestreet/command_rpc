@@ -12,6 +12,7 @@ end = struct
       ~version:1
       ~bin_query:[%bin_type_class: unit]
       ~bin_response:[%bin_type_class: int]
+      ~include_in_error_count:Only_on_exn
   ;;
 
   let implementation () () = return 42
@@ -29,7 +30,14 @@ struct
   type query = unit [@@deriving bin_io, of_sexp]
   type response = string Or_error.t [@@deriving bin_io, sexp_of]
 
-  let rpc = Rpc.Rpc.create ~name:"callee_rpc" ~version:1 ~bin_query ~bin_response
+  let rpc =
+    Rpc.Rpc.create
+      ~name:"callee_rpc"
+      ~version:1
+      ~bin_query
+      ~bin_response
+      ~include_in_error_count:Or_error
+  ;;
 
   let implementation invocation () =
     match (invocation : Command_rpc.Command.Invocation.t) with

@@ -9,6 +9,7 @@ let rpc =
     ~version:1
     ~bin_query:Int.V1.bin_t
     ~bin_response:Unit.V1.bin_t
+    ~include_in_error_count:Only_on_exn
 ;;
 
 let rpc_one_way =

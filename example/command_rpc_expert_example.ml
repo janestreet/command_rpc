@@ -8,7 +8,14 @@ module Send_summand = struct
   type response = unit [@@deriving bin_io, sexp]
   type nonrec state = state
 
-  let rpc = Rpc.Rpc.create ~name:"send-summand" ~version:1 ~bin_query ~bin_response
+  let rpc =
+    Rpc.Rpc.create
+      ~name:"send-summand"
+      ~version:1
+      ~bin_query
+      ~bin_response
+      ~include_in_error_count:Only_on_exn
+  ;;
 
   let implementation state query =
     state.sum <- state.sum + query;
@@ -21,7 +28,15 @@ module Get_sum = struct
   type response = int [@@deriving bin_io, sexp]
   type nonrec state = state
 
-  let rpc = Rpc.Rpc.create ~name:"get-sum" ~version:1 ~bin_query ~bin_response
+  let rpc =
+    Rpc.Rpc.create
+      ~name:"get-sum"
+      ~version:1
+      ~bin_query
+      ~bin_response
+      ~include_in_error_count:Only_on_exn
+  ;;
+
   let implementation state () = return state.sum
 end
 

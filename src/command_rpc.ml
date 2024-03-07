@@ -539,13 +539,13 @@ module Connection = struct
     -> 'a
 
   let transfer_stdout child_stdout =
-    Writer.splice ~from:child_stdout (Lazy.force Writer.stdout)
-    >>= fun (_ : [ `Ok | `Error | `Consumer_left ]) -> Reader.close child_stdout
+    let%bind () = Writer.splice ~from:child_stdout (Lazy.force Writer.stdout) in
+    Reader.close child_stdout
   ;;
 
   let transfer_stderr child_stderr =
-    Writer.splice ~from:child_stderr (Lazy.force Writer.stderr)
-    >>= fun (_ : [ `Ok | `Error | `Consumer_left ]) -> Reader.close child_stderr
+    let%bind () = Writer.splice ~from:child_stderr (Lazy.force Writer.stderr) in
+    Reader.close child_stderr
   ;;
 
   let handle_stdout ~(stdout_handling : Stdout_handling.t) stdout =
