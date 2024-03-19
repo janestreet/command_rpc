@@ -55,8 +55,7 @@ let null_implementations ~on_unknown_rpc =
 let%expect_test _ =
   let%bind () = test false `Sexp in
   [%expect
-    {|
-      (Error"I can't know what the secret number is because I was invoked in sexp mode") |}];
+    {| (Error"I can't know what the secret number is because I was invoked in sexp mode") |}];
   let%bind () =
     test
       false
@@ -72,7 +71,8 @@ let%expect_test _ =
   [%expect
     {|
     (Ok (Ok "The secret number is 42"))
-    (Ok (Ok "The secret number is 42")) |}];
+    (Ok (Ok "The secret number is 42"))
+    |}];
   let%bind () = test false (`Bin_io (null_implementations ~on_unknown_rpc:`Continue)) in
   let%bind () = test true (`Bin_io (null_implementations ~on_unknown_rpc:`Continue)) in
   [%expect
@@ -96,7 +96,8 @@ let%expect_test _ =
           (pid        <hidden_in_test>)
           (parent_pid <hidden_in_test>)))
         (rpc_name    caller_rpc)
-        (rpc_version 1)))) |}];
+        (rpc_version 1))))
+    |}];
   (* Note that the error is on the *caller* side. *)
   let%bind () =
     test false (`Bin_io (null_implementations ~on_unknown_rpc:`Close_connection))
@@ -123,7 +124,8 @@ let%expect_test _ =
         (args      <hidden_in_test>)
         (child_pid <hidden_in_test>)))
       (rpc_name    callee_rpc)
-      (rpc_version 1))) |}];
+      (rpc_version 1)))
+    |}];
   (* Note that the error is on the *caller* side. *)
   let%bind () = test false (`Bin_io (null_implementations ~on_unknown_rpc:`Raise)) in
   let%bind () = test true (`Bin_io (null_implementations ~on_unknown_rpc:`Raise)) in
@@ -164,6 +166,7 @@ let%expect_test _ =
         (args      <hidden_in_test>)
         (child_pid <hidden_in_test>)))
       (rpc_name    callee_rpc)
-      (rpc_version 1))) |}];
+      (rpc_version 1)))
+    |}];
   return ()
 ;;

@@ -21,7 +21,8 @@ let%expect_test _ =
         "Command_rpc client (parent process)"
         (prog      <hidden_in_test>)
         (args      <hidden_in_test>)
-        (child_pid <hidden_in_test>))))) |}];
+        (child_pid <hidden_in_test>)))))
+    |}];
   return ()
 ;;
 
@@ -56,6 +57,7 @@ let%expect_test _ =
         (args      <hidden_in_test>)
         (child_pid <hidden_in_test>)))
       (rpc_name    exit_zero)
-      (rpc_version 1))) |}];
+      (rpc_version 1)))
+    |}];
   return ()
 ;;

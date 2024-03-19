@@ -56,7 +56,8 @@ let%expect_test "client is up to date" =
     Version used by server: 2
     "did not raise"
     Version used by server: 2
-    "did not raise" |}];
+    "did not raise"
+    |}];
   return ()
 ;;
 
@@ -68,7 +69,8 @@ let%expect_test "client is acceptably behind" =
     Version used by server: 1
     "did not raise"
     Version used by server: 1
-    "did not raise" |}];
+    "did not raise"
+    |}];
   return ()
 ;;
 
@@ -94,7 +96,8 @@ let%expect_test "client is too far behind" =
         (args      <hidden_in_test>)
         (child_pid <hidden_in_test>)))
       (rpc_name    heartbeat)
-      (rpc_version 0))) |}];
+      (rpc_version 0)))
+    |}];
   return ()
 ;;
 
@@ -120,6 +123,7 @@ let%expect_test "client is ahead" =
         (args      <hidden_in_test>)
         (child_pid <hidden_in_test>)))
       (rpc_name    heartbeat)
-      (rpc_version 3))) |}];
+      (rpc_version 3)))
+    |}];
   return ()
 ;;

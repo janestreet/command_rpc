@@ -49,7 +49,8 @@ let%expect_test "client is up to date" =
   let%bind () = test true { client = 2; server_min = 1; server_max = 2 } in
   [%expect {|
     "did not raise"
-    "did not raise" |}];
+    "did not raise"
+    |}];
   return ()
 ;;
 
@@ -58,7 +59,8 @@ let%expect_test "client is acceptably behind" =
   let%bind () = test true { client = 1; server_min = 1; server_max = 2 } in
   [%expect {|
     "did not raise"
-    "did not raise" |}];
+    "did not raise"
+    |}];
   return ()
 ;;
 
@@ -84,7 +86,8 @@ let%expect_test "client is too far behind" =
         (args      <hidden_in_test>)
         (child_pid <hidden_in_test>)))
       (rpc_name    heartbeat-state)
-      (rpc_version 0))) |}];
+      (rpc_version 0)))
+    |}];
   return ()
 ;;
 
@@ -110,6 +113,7 @@ let%expect_test "client is ahead" =
         (args      <hidden_in_test>)
         (child_pid <hidden_in_test>)))
       (rpc_name    heartbeat-state)
-      (rpc_version 3))) |}];
+      (rpc_version 3)))
+    |}];
   return ()
 ;;
