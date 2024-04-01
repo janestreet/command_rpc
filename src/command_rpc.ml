@@ -239,7 +239,7 @@ module Command = struct
     res
   ;;
 
-  let use_fds_for_rpc (read_fd, write_fd) =
+  let use_fds_for_rpc ?buffer_age_limit (read_fd, write_fd) =
     let create_fd name file_descr_no =
       let file_descr = Core_unix.File_descr.of_int file_descr_no in
       (* In the common case [read_fd] and [write_fd] originate from being inherited from
@@ -248,7 +248,7 @@ module Command = struct
       Fd.create Fifo file_descr (Info.create "RPC server" name [%sexp_of: string])
     in
     let reader = Reader.create (create_fd "rpc-read" read_fd) in
-    let writer = Writer.create (create_fd "rpc-write" write_fd) in
+    let writer = Writer.create ?buffer_age_limit (create_fd "rpc-write" write_fd) in
     reader, writer
   ;;
 
@@ -283,7 +283,7 @@ module Command = struct
       let rpc_read, rpc_write =
         match rpc_fds with
         | None -> claim_stdin_and_stdout_for_exclusive_use ?buffer_age_limit ()
-        | Some fd_pair -> use_fds_for_rpc fd_pair
+        | Some fd_pair -> use_fds_for_rpc ?buffer_age_limit fd_pair
       in
       match mode with
       | `Bin_prot ->
