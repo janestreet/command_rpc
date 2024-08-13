@@ -45,9 +45,9 @@ module type T_pipe_conv = sig
 
   include
     Versioned_rpc.Callee_converts.Pipe_rpc.S
-      with type query := query
-      with type response := response
-      with type error := error
+    with type query := query
+    with type response := response
+    with type error := error
 
   val implementation
     :  state
@@ -151,7 +151,7 @@ module type Command_rpc = sig
                  (** Set the buffer age limit of the stdout writer *)
             -> t list
             -> unit Deferred.t)
-           Command.Param.t
+             Command.Param.t
     end
   end
 
@@ -159,7 +159,7 @@ module type Command_rpc = sig
     module Stdout_handling : sig
       type t =
         | Default
-            (** semantics depend on [new_fds_for_rpc]. If [new_fds_for_rpc = false], [stdout]
+        (** semantics depend on [new_fds_for_rpc]. If [new_fds_for_rpc = false], [stdout]
             is merged with [stderr], and then handled however [stderr] is handled (see
             [Stderr_handling]). If [new_fds_for_rpc = true], then [stdout] is propagated.
         *)

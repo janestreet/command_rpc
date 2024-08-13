@@ -44,7 +44,8 @@ let test new_fds_for_rpc (versions : Versions.t) =
 let%expect_test "client is up to date" =
   let%bind () = test false { client = 2; server_min = 1; server_max = 2 } in
   let%bind () = test true { client = 2; server_min = 1; server_max = 2 } in
-  [%expect {|
+  [%expect
+    {|
     "did not raise"
     "did not raise"
     |}];
@@ -54,7 +55,8 @@ let%expect_test "client is up to date" =
 let%expect_test "client is acceptably behind" =
   let%bind () = test false { client = 1; server_min = 1; server_max = 2 } in
   let%bind () = test true { client = 1; server_min = 1; server_max = 2 } in
-  [%expect {|
+  [%expect
+    {|
     "did not raise"
     "did not raise"
     |}];

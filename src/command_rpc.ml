@@ -295,6 +295,7 @@ module Command = struct
                   (List.concat_map
                      ~f:(implementations ?log_not_previously_seen_version)
                      impls))
+             ~on_exception:Log_on_background_exn
          with
          | Error (`Duplicate_implementations descriptions) ->
            raise_s
@@ -320,55 +321,56 @@ module Command = struct
       | `Sexp ->
         Reader.read_sexp rpc_read
         >>= (function
-        | `Eof -> failwith "unexpected EOF on stdin"
-        | `Ok sexp ->
-          let call = call_of_sexp sexp in
-          (match Map.find (menu impls) (call.rpc_name, call.version) with
-           | None -> failwithf "unimplemented rpc: (%s, %d)" call.rpc_name call.version ()
-           | Some impl ->
-             (match impl with
-              | `Plain (module T) ->
-                let query = T.query_of_sexp call.query in
-                T.implementation Sexp query
-                >>| fun response ->
-                write_sexp rpc_write (T.sexp_of_response response);
-                `Success
-              | `Plain_conv (module T) ->
-                let query = T.query_of_sexp call.query in
-                T.implementation Sexp ~version:call.version query
-                >>| fun response ->
-                write_sexp rpc_write (T.sexp_of_response response);
-                `Success
-              | `Pipe (module T) ->
-                let query = T.query_of_sexp call.query in
-                T.implementation Sexp query
-                >>= (function
-                | Error e ->
-                  write_sexp rpc_write (T.sexp_of_error e);
-                  return `Failure
-                | Ok pipe ->
-                  Pipe.iter pipe ~f:(fun r ->
-                    write_sexp rpc_write (T.sexp_of_response r);
-                    Deferred.unit)
-                  >>| fun () -> `Success)
-              | `Pipe_conv (module T) ->
-                let query = T.query_of_sexp call.query in
-                T.implementation Sexp ~version:call.version query
-                >>= (function
-                | Error e ->
-                  write_sexp rpc_write (T.sexp_of_error e);
-                  return `Failure
-                | Ok pipe ->
-                  Pipe.iter pipe ~f:(fun r ->
-                    write_sexp rpc_write (T.sexp_of_response r);
-                    Deferred.unit)
-                  >>| fun () -> `Success)
-              | `Implementations _ ->
-                failwithf
-                  "This RPC is not supported in [-sexp] mode: (%s, %d)"
-                  call.rpc_name
-                  call.version
-                  ()))))
+         | `Eof -> failwith "unexpected EOF on stdin"
+         | `Ok sexp ->
+           let call = call_of_sexp sexp in
+           (match Map.find (menu impls) (call.rpc_name, call.version) with
+            | None ->
+              failwithf "unimplemented rpc: (%s, %d)" call.rpc_name call.version ()
+            | Some impl ->
+              (match impl with
+               | `Plain (module T) ->
+                 let query = T.query_of_sexp call.query in
+                 T.implementation Sexp query
+                 >>| fun response ->
+                 write_sexp rpc_write (T.sexp_of_response response);
+                 `Success
+               | `Plain_conv (module T) ->
+                 let query = T.query_of_sexp call.query in
+                 T.implementation Sexp ~version:call.version query
+                 >>| fun response ->
+                 write_sexp rpc_write (T.sexp_of_response response);
+                 `Success
+               | `Pipe (module T) ->
+                 let query = T.query_of_sexp call.query in
+                 T.implementation Sexp query
+                 >>= (function
+                  | Error e ->
+                    write_sexp rpc_write (T.sexp_of_error e);
+                    return `Failure
+                  | Ok pipe ->
+                    Pipe.iter pipe ~f:(fun r ->
+                      write_sexp rpc_write (T.sexp_of_response r);
+                      Deferred.unit)
+                    >>| fun () -> `Success)
+               | `Pipe_conv (module T) ->
+                 let query = T.query_of_sexp call.query in
+                 T.implementation Sexp ~version:call.version query
+                 >>= (function
+                  | Error e ->
+                    write_sexp rpc_write (T.sexp_of_error e);
+                    return `Failure
+                  | Ok pipe ->
+                    Pipe.iter pipe ~f:(fun r ->
+                      write_sexp rpc_write (T.sexp_of_response r);
+                      Deferred.unit)
+                    >>| fun () -> `Success)
+               | `Implementations _ ->
+                 failwithf
+                   "This RPC is not supported in [-sexp] mode: (%s, %d)"
+                   call.rpc_name
+                   call.version
+                   ()))))
   ;;
 
   let async_main status_deferred =
@@ -404,12 +406,12 @@ module Command = struct
             ~if_nothing_chosen:(Default_to (false, None))
         in
         fun ?connection_description
-            ?handshake_timeout
-            ?heartbeat_config
-            ?max_message_size
-            ?log_not_previously_seen_version
-            ?buffer_age_limit
-            impls ->
+          ?handshake_timeout
+          ?heartbeat_config
+          ?max_message_size
+          ?log_not_previously_seen_version
+          ?buffer_age_limit
+          impls ->
           main
             ?connection_description
             ?handshake_timeout
@@ -436,21 +438,21 @@ module Command = struct
             ?log_not_previously_seen_version
             ?buffer_age_limit
             rpcs
-            ->
-        (* If you want to detect success or failure and do something appropriate,
+          ->
+          (* If you want to detect success or failure and do something appropriate,
                  you can just do that from your RPC implementation. But we still need
                  [param_exit_status] separately because [create] below doesn't have
                  access to the RPC implementations. *)
-        main
-          ?connection_description
-          ?handshake_timeout
-          ?heartbeat_config
-          ?max_message_size
-          ?log_not_previously_seen_version
-          ?buffer_age_limit
-          rpcs
-        >>| function
-        | `Success | `Failure -> ())
+          main
+            ?connection_description
+            ?handshake_timeout
+            ?heartbeat_config
+            ?max_message_size
+            ?log_not_previously_seen_version
+            ?buffer_age_limit
+            rpcs
+          >>| function
+          | `Success | `Failure -> ())
     ;;
   end
 
@@ -728,24 +730,24 @@ module Connection = struct
       ~args
       ?working_dir
       (fun ~rpc_read ~rpc_write ~process ~wait ->
-      let%bind result =
-        Rpc.Connection.with_close
-          rpc_read
-          rpc_write
-          ~description:
-            (get_connection_description ~connection_description ~prog ~args ~process)
-          ~handshake_timeout
-          ~heartbeat_config
-          ?max_message_size
-          ?implementations
-          ~connection_state:(fun _ -> ())
-          ~on_handshake_error:(`Call (fun exn -> return (Or_error.of_exn exn)))
-          ~dispatch_queries:(fun rpc_connection ->
-            dispatch_queries { process; wait; rpc_connection })
-      in
-      let%bind exit_or_signal = wait in
-      ignore (exit_or_signal : Unix.Exit_or_signal.t);
-      return result)
+         let%bind result =
+           Rpc.Connection.with_close
+             rpc_read
+             rpc_write
+             ~description:
+               (get_connection_description ~connection_description ~prog ~args ~process)
+             ~handshake_timeout
+             ~heartbeat_config
+             ?max_message_size
+             ?implementations
+             ~connection_state:(fun _ -> ())
+             ~on_handshake_error:(`Call (fun exn -> return (Or_error.of_exn exn)))
+             ~dispatch_queries:(fun rpc_connection ->
+               dispatch_queries { process; wait; rpc_connection })
+         in
+         let%bind exit_or_signal = wait in
+         ignore (exit_or_signal : Unix.Exit_or_signal.t);
+         return result)
   ;;
 
   let create
@@ -776,18 +778,18 @@ module Connection = struct
       ~args
       ?working_dir
       (fun ~rpc_read ~rpc_write ~process ~wait ->
-      Rpc.Connection.create
-        rpc_read
-        rpc_write
-        ~description:
-          (get_connection_description ~connection_description ~prog ~args ~process)
-        ~handshake_timeout
-        ~heartbeat_config
-        ?max_message_size
-        ?implementations
-        ~connection_state:(fun _ -> ())
-      >>| Or_error.of_exn_result
-      >>| Or_error.map ~f:(fun rpc_connection -> { process; wait; rpc_connection }))
+         Rpc.Connection.create
+           rpc_read
+           rpc_write
+           ~description:
+             (get_connection_description ~connection_description ~prog ~args ~process)
+           ~handshake_timeout
+           ~heartbeat_config
+           ?max_message_size
+           ?implementations
+           ~connection_state:(fun _ -> ())
+         >>| Or_error.of_exn_result
+         >>| Or_error.map ~f:(fun rpc_connection -> { process; wait; rpc_connection }))
   ;;
 
   module Expert = struct

@@ -54,7 +54,6 @@ let%expect_test "transfer to pipe" =
           [%sexp
             "Differing results based on function inputs. All should be the same:"
             , (results : (Sexp.t * string) list)])
-      [%here]
       (Option.is_some result_string);
     Option.iter result_string ~f:print_endline
   in

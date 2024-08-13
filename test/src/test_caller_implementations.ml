@@ -49,7 +49,10 @@ let test new_fds_for_rpc mode =
 ;;
 
 let null_implementations ~on_unknown_rpc =
-  Rpc.Implementations.create_exn ~implementations:[] ~on_unknown_rpc
+  Rpc.Implementations.create_exn
+    ~implementations:[]
+    ~on_unknown_rpc
+    ~on_exception:Log_on_background_exn
 ;;
 
 let%expect_test _ =

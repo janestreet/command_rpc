@@ -1,6 +1,6 @@
 (library
  (name command_rpc)
  (public_name command_rpc)
- (libraries async core)
+ (libraries async core core_unix core_kernel.sexp_hidden_in_test)
  (preprocess
   (pps ppx_jane)))

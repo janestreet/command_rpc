@@ -21,6 +21,7 @@ end = struct
     Rpc.Implementations.create_exn
       ~on_unknown_rpc:`Raise
       ~implementations:[ Rpc.Rpc.implement rpc implementation ]
+      ~on_exception:Log_on_background_exn
   ;;
 end
 

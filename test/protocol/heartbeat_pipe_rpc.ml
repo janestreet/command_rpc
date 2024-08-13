@@ -33,18 +33,18 @@ let make_serialization (type a) (module M : Stable with type t = a) version =
 ;;
 
 module type Register = functor
-  (Version_i : sig
-     type query = int [@@deriving bin_io]
-     type response = int [@@deriving bin_io]
-     type error = Error.t [@@deriving bin_io]
+    (Version_i : sig
+       type query = int [@@deriving bin_io]
+       type response = int [@@deriving bin_io]
+       type error = Error.t [@@deriving bin_io]
 
-     val version : int
-     val model_of_query : query -> query
-     val error_of_model : error -> error
-     val response_of_model : response -> response
-     val client_pushes_back : bool
-   end)
-  -> sig
+       val version : int
+       val model_of_query : query -> query
+       val error_of_model : error -> error
+       val response_of_model : response -> response
+       val client_pushes_back : bool
+     end)
+    -> sig
   val rpc : (Version_i.query, Version_i.response, Version_i.error) Rpc.Pipe_rpc.t
 end
 
@@ -77,9 +77,9 @@ module type S_make = sig
 
   include
     Versioned_rpc.Callee_converts.Pipe_rpc.S
-      with type query := query
-       and type response := response
-       and type error := error
+    with type query := query
+     and type response := response
+     and type error := error
 
   module Register : Register
 end
@@ -91,12 +91,12 @@ let make () =
     type error = Error.t [@@deriving sexp_of]
 
     include Versioned_rpc.Callee_converts.Pipe_rpc.Make (struct
-      let name = "heartbeat"
+        let name = "heartbeat"
 
-      type nonrec query = query
-      type nonrec response = response
-      type nonrec error = error
-    end)
+        type nonrec query = query
+        type nonrec response = response
+        type nonrec error = error
+      end)
   end : S_make)
 ;;
 
@@ -110,7 +110,7 @@ let server ~min_version ~max_version =
       for version = min_version to max_version do
         ignore
           (register_version (module Register) version
-            : (query, response, error) Rpc.Pipe_rpc.t)
+           : (query, response, error) Rpc.Pipe_rpc.t)
       done
     ;;
 

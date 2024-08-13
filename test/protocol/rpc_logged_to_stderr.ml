@@ -25,7 +25,10 @@ let implementation (_ : Command_rpc.Command.Invocation.t) n =
 ;;
 
 let implementations =
-  [ Rpc.One_way.implement rpc_one_way implementation_one_way
+  [ Rpc.One_way.implement
+      rpc_one_way
+      implementation_one_way
+      ~on_exception:Close_connection
   ; Rpc.Rpc.implement rpc implementation
   ]
 ;;
