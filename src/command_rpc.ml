@@ -630,7 +630,7 @@ module Connection = struct
       in
       let wait = Process.wait process in
       let wait =
-        let%map wait = wait
+        let%map wait
         and () = stdin_closed
         and () = output_flushed in
         wait
@@ -674,7 +674,7 @@ module Connection = struct
         match wait_for_stderr_transfer with
         | false -> wait
         | true ->
-          let%map wait = wait
+          let%map wait
           and () = stderr_flushed in
           wait
       in
