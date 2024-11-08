@@ -16,12 +16,12 @@ let%expect_test _ =
   [%expect
     {|
     (Error (
-      connection.ml.Handshake_error.Handshake_error
-      (Eof (
-        "Command_rpc client (parent process)"
-        (prog      <hidden_in_test>)
-        (args      <hidden_in_test>)
-        (child_pid <hidden_in_test>)))))
+      handshake_error.ml.Handshake_error (
+        Eof (
+          "Command_rpc client (parent process)"
+          (prog      <hidden_in_test>)
+          (args      <hidden_in_test>)
+          (child_pid <hidden_in_test>)))))
     |}];
   return ()
 ;;
