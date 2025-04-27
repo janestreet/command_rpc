@@ -59,15 +59,14 @@ end
 module type Command_rpc = sig
   (** [Command] is used for setting up an RPC server in the child process communicating
       with the parent over stdin&stdout. By default this will use an Async RPC protocol,
-      but passing the [-sexp] flag will make it use a sexp-based interface.  Passing the
+      but passing the [-sexp] flag will make it use a sexp-based interface. Passing the
       [-menu] flag will cause the command to print out a sexp indicating which RPC names
       and versions are supported.
 
       Since stdout is used for communication with the parent process, it's not available
-      for use as a debug output channel. We remap the file descriptors in the child
-      in such a way that any attempted write to stdout gets sent to stderr instead.
-      Then stderr can be forwarded to stderr of the parent if [propagate_stderr = true].
-  *)
+      for use as a debug output channel. We remap the file descriptors in the child in
+      such a way that any attempted write to stdout gets sent to stderr instead. Then
+      stderr can be forwarded to stderr of the parent if [propagate_stderr = true]. *)
   module Command : sig
     module Invocation : sig
       type t =
@@ -91,9 +90,9 @@ module type Command_rpc = sig
         ]
 
       (** Given an RPC that expects a state type ['a], it can use a state type ['b] if we
-          tell it how to extract an ['a] from it. Note that this extraction is done on every
-          RPC call, so should be cheap and should not copy mutable state that you want to
-          persist across calls. *)
+          tell it how to extract an ['a] from it. Note that this extraction is done on
+          every RPC call, so should be cheap and should not copy mutable state that you
+          want to persist across calls. *)
       val lift : 'a t -> f:('b -> 'a) -> 'b t
     end
 
@@ -121,6 +120,7 @@ module type Command_rpc = sig
       -> ?max_message_size:int
       -> ?log_not_previously_seen_version:(name:string -> int -> unit)
       -> ?buffer_age_limit:Writer.buffer_age_limit
+      -> ?on_connection:(Rpc.Connection.t -> unit)
       -> summary:string
       -> t list
       -> Command.t
@@ -135,8 +135,8 @@ module type Command_rpc = sig
 
           This interface is marked [Expert] because consuming from stdin or writing to
           stdout during your initialization may prevent you from receiving RPCs or
-          responding to them properly, but we cannot check that you don't do this or prevent
-          you from doing it, so you just have to be careful.
+          responding to them properly, but we cannot check that you don't do this or
+          prevent you from doing it, so you just have to be careful.
 
           You are responsible for ensuring that the async scheduler is started, e.g., by
           calling [Command.async_or_error']. *)
@@ -149,6 +149,7 @@ module type Command_rpc = sig
             -> ?log_not_previously_seen_version:(name:string -> int -> unit)
             -> ?buffer_age_limit:Writer.buffer_age_limit
                  (** Set the buffer age limit of the stdout writer *)
+            -> ?on_connection:(Rpc.Connection.t -> unit)
             -> t list
             -> unit Deferred.t)
              Command.Param.t
@@ -161,8 +162,7 @@ module type Command_rpc = sig
         | Default
         (** semantics depend on [new_fds_for_rpc]. If [new_fds_for_rpc = false], [stdout]
             is merged with [stderr], and then handled however [stderr] is handled (see
-            [Stderr_handling]). If [new_fds_for_rpc = true], then [stdout] is propagated.
-        *)
+            [Stderr_handling]). If [new_fds_for_rpc = true], then [stdout] is propagated. *)
         | Propagate_stdout
         | Custom of (Reader.t -> unit Deferred.t)
 
@@ -185,18 +185,19 @@ module type Command_rpc = sig
     type 'a with_connection_args =
       ?new_fds_for_rpc:bool
         (** Defaults to [false]. If [true], instead of using [stdin] and [stdout] for the
-          RPC connection, new pipes will be created for the connection, and [stdout] from
-          the child process won't be merged with [stderr]. *)
+            RPC connection, new pipes will be created for the connection, and [stdout]
+            from the child process won't be merged with [stderr]. *)
       -> ?stdout_handling:Stdout_handling.t (** default: [Stdout_handling.default] *)
       -> ?stderr_handling:Stderr_handling.t (** default: [Stderr_handling.default] *)
       -> ?wait_for_stderr_transfer:bool
-           (** Defaults to [true]. If set to true, makes [with_close] and [Expert.wait] wait
-          for stderr to have been fully propagated, fully drained, or for the user
-          callback (in the case of [stderr_handling = Custom _]) to complete. *)
+           (** Defaults to [true]. If set to true, makes [with_close] and [Expert.wait]
+               wait for stderr to have been fully propagated, fully drained, or for the
+               user callback (in the case of [stderr_handling = Custom _]) to complete. *)
       -> ?connection_description:Info.t
       -> ?handshake_timeout:Time_float.Span.t
       -> ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
       -> ?max_message_size:int
+      -> ?buffer_age_limit:Writer.buffer_age_limit
       -> ?implementations:unit Rpc.Implementations.t
       -> ?env:Process.env (* defaults to [`Extend []] *)
       -> ?process_create:
@@ -237,8 +238,7 @@ module type Command_rpc = sig
       (** Send a signal to the command-rpc executable. *)
       val kill : t -> Signal.t -> unit
 
-      (** Wait for termination of the command-rpc executable and return
-          the exit status.
+      (** Wait for termination of the command-rpc executable and return the exit status.
           This can be used e.g. after [with_close] to collect the missing info, since
           [with_close] does not report it. *)
       val wait : t -> Unix.Exit_or_signal.t Deferred.t

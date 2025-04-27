@@ -41,9 +41,9 @@ let%expect_test "transfer to pipe" =
     let%map results =
       Deferred.List.map ~how:`Sequential [%all: bool] ~f:(fun new_fds_for_rpc ->
         let result = Set_once.create () in
-        let f reader = Reader.contents reader >>| Set_once.set_exn result [%here] in
+        let f reader = Reader.contents reader >>| Set_once.set_exn result ~here:[%here] in
         let%map () = test (Custom f) new_fds_for_rpc n in
-        [%sexp { new_fds_for_rpc : bool }], Set_once.get_exn result [%here])
+        [%sexp { new_fds_for_rpc : bool }], Set_once.get_exn result)
     in
     let result_string =
       List.all_equal results ~equal:[%equal: _ * string] |> Option.map ~f:snd

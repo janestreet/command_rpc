@@ -155,7 +155,8 @@ module Command = struct
     | `Plain_conv (module T) ->
       T.implement_multi ?log_not_previously_seen_version (fun s ~version q ->
         T.implementation s ~version q)
-    | `Pipe (module T) -> [ Rpc.Pipe_rpc.implement T.rpc T.implementation ]
+    | `Pipe (module T) ->
+      [ Rpc.Pipe_rpc.implement T.rpc T.implementation ~leave_open_on_exception:true ]
     | `Pipe_conv (module T) ->
       T.implement_multi ?log_not_previously_seen_version (fun s ~version q ->
         T.implementation s ~version q)
@@ -175,13 +176,12 @@ module Command = struct
   ;;
 
   (** This function returns [stdin] and [stdout] that are connected to the same kernel
-      objects (files/pipes/etc) as [Reader.stdin] and [Writer.stdout] before the
-      call, except they will have new file descriptor numbers (greater than 2) to avoid
-      the other parts of the program writing there by accident.
+      objects (files/pipes/etc) as [Reader.stdin] and [Writer.stdout] before the call,
+      except they will have new file descriptor numbers (greater than 2) to avoid the
+      other parts of the program writing there by accident.
 
       It also changes file descriptors such that after this function [Reader.stdin] is
-      reading from /dev/null and [Writer.stdout] is writing to stderr.
-  *)
+      reading from /dev/null and [Writer.stdout] is writing to stderr. *)
   let claim_stdin_and_stdout_for_exclusive_use ?buffer_age_limit () =
     let same_fd fd1 fd2 =
       Int.( = ) (Core_unix.File_descr.to_int fd1) (Core_unix.File_descr.to_int fd2)
@@ -269,6 +269,7 @@ module Command = struct
     ?max_message_size
     ?log_not_previously_seen_version
     ?buffer_age_limit
+    ?on_connection
     impls
     ~show_menu
     ?rpc_fds
@@ -315,7 +316,9 @@ module Command = struct
              ~heartbeat_config
              ?max_message_size
              ~implementations
-             ~connection_state:(fun conn -> Bin_io conn)
+             ~connection_state:(fun conn ->
+               Option.iter on_connection ~f:(fun f -> f conn);
+               Bin_io conn)
              ~on_handshake_error:`Raise
            >>| fun () -> `Success)
       | `Sexp ->
@@ -411,6 +414,7 @@ module Command = struct
           ?max_message_size
           ?log_not_previously_seen_version
           ?buffer_age_limit
+          ?on_connection
           impls ->
           main
             ?connection_description
@@ -419,6 +423,7 @@ module Command = struct
             ?max_message_size
             ?log_not_previously_seen_version
             ?buffer_age_limit
+            ?on_connection
             impls
             ~show_menu
             ?rpc_fds
@@ -437,6 +442,7 @@ module Command = struct
             ?max_message_size
             ?log_not_previously_seen_version
             ?buffer_age_limit
+            ?on_connection
             rpcs
           ->
           (* If you want to detect success or failure and do something appropriate,
@@ -450,6 +456,7 @@ module Command = struct
             ?max_message_size
             ?log_not_previously_seen_version
             ?buffer_age_limit
+            ?on_connection
             rpcs
           >>| function
           | `Success | `Failure -> ())
@@ -463,6 +470,7 @@ module Command = struct
     ?max_message_size
     ?log_not_previously_seen_version
     ?buffer_age_limit
+    ?on_connection
     ~summary
     impls
     =
@@ -480,6 +488,7 @@ module Command = struct
                ?max_message_size
                ?log_not_previously_seen_version
                ?buffer_age_limit
+               ?on_connection
                impls)]
   ;;
 end
@@ -526,6 +535,7 @@ module Connection = struct
     -> ?handshake_timeout:Time_float.Span.t
     -> ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
     -> ?max_message_size:int
+    -> ?buffer_age_limit:Writer.buffer_age_limit
     -> ?implementations:unit Rpc.Implementations.t
     -> ?env:Process.env (* defaults to [`Extend []] *)
     -> ?process_create:
@@ -565,6 +575,7 @@ module Connection = struct
 
   let connect_gen
     ?(new_fds_for_rpc = false)
+    ?buffer_age_limit
     ~(stdout_handling : Stdout_handling.t)
     ~(stderr_handling : Stderr_handling.t)
     ~wait_for_stderr_transfer
@@ -618,7 +629,7 @@ module Connection = struct
           (Info.create "parent process" ~here:[%here] name [%sexp_of: string])
       in
       let rpc_read = Reader.create (create_fd "rpc-read" from_sub_r) in
-      let rpc_write = Writer.create (create_fd "rpc-write" to_sub_w) in
+      let rpc_write = Writer.create ?buffer_age_limit (create_fd "rpc-write" to_sub_w) in
       let stdin = Process.stdin process in
       let stdin_closed = Writer.close stdin in
       let stdout = Process.stdout process in
@@ -659,6 +670,7 @@ module Connection = struct
       process_create ~prog ~args ~env ?working_dir ()
       >>=? fun process ->
       let stdin = Process.stdin process in
+      Option.iter buffer_age_limit ~f:(Writer.set_buffer_age_limit stdin);
       let stdout = Process.stdout process in
       let stderr = Process.stderr process in
       let stderr_flushed = handle_stderr ~stderr_handling stderr in
@@ -711,6 +723,7 @@ module Connection = struct
     ?(handshake_timeout = default_handshake_timeout ~side:`parent)
     ?(heartbeat_config = default_heartbeat_config ~side:`parent)
     ?max_message_size
+    ?buffer_age_limit
     ?implementations
     ?(env = `Extend [])
     ?process_create
@@ -721,6 +734,7 @@ module Connection = struct
     =
     connect_gen
       ?new_fds_for_rpc
+      ?buffer_age_limit
       ~wait_for_stderr_transfer
       ~stdout_handling
       ~stderr_handling
@@ -759,6 +773,7 @@ module Connection = struct
     ?(handshake_timeout = default_handshake_timeout ~side:`parent)
     ?(heartbeat_config = default_heartbeat_config ~side:`parent)
     ?max_message_size
+    ?buffer_age_limit
     ?implementations
     ?(env = `Extend [])
     ?process_create
@@ -769,6 +784,7 @@ module Connection = struct
     =
     connect_gen
       ?new_fds_for_rpc
+      ?buffer_age_limit
       ~stdout_handling
       ~stderr_handling
       ~wait_for_stderr_transfer

@@ -2,7 +2,7 @@ open! Core
 open! Async
 open! Import
 
-let () = Backtrace.elide := true
+let () = Dynamic.set_root Backtrace.elide true
 
 let%expect_test _ =
   let%bind connection_or_error =
