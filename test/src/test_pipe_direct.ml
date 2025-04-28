@@ -33,6 +33,7 @@ let test new_fds_for_rpc num_heartbeats =
 ;;
 
 let%expect_test _ =
+  let%bind () = Async.Async_for_tests.allocate_all_fds () in
   let initial_number_of_fds = fd_count () in
   let%bind () = test false 0 in
   [%expect {| 0 |}];

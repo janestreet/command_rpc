@@ -2,7 +2,7 @@ open! Core
 open! Async
 open! Import
 
-let () = Backtrace.elide := true
+let () = Dynamic.set_root Backtrace.elide true
 
 let test new_fds_for_rpc mode =
   match mode with
