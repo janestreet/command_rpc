@@ -292,10 +292,9 @@ module Command = struct
            Rpc.Implementations.create
              ~on_unknown_rpc:`Raise
              ~implementations:
-               (Versioned_rpc.Menu.add
-                  (List.concat_map
-                     ~f:(implementations ?log_not_previously_seen_version)
-                     impls))
+               (List.concat_map
+                  ~f:(implementations ?log_not_previously_seen_version)
+                  impls)
              ~on_exception:Log_on_background_exn
          with
          | Error (`Duplicate_implementations descriptions) ->
