@@ -523,7 +523,7 @@ module Connection = struct
 
   let rpc_connection t = t.rpc_connection
   let wait t = t.wait
-  let kill t signal = Process.send_signal t.process signal
+  let process t = t.process
 
   type 'a with_connection_args =
     ?new_fds_for_rpc:bool
@@ -809,6 +809,6 @@ module Connection = struct
 
   module Expert = struct
     let wait = wait
-    let kill = kill
+    let process = process
   end
 end
