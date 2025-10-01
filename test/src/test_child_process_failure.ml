@@ -17,8 +17,8 @@ let%expect_test _ =
     {|
     (Error (
       handshake_error.ml.Handshake_error (
-        Eof (
-          "Command_rpc client (parent process)"
+        (Eof_during_step Header)
+        ("Command_rpc client (parent process)"
           (prog      <hidden_in_test>)
           (args      <hidden_in_test>)
           (child_pid <hidden_in_test>)))))
