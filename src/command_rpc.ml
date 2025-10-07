@@ -292,10 +292,9 @@ module Command = struct
            Rpc.Implementations.create
              ~on_unknown_rpc:`Raise
              ~implementations:
-               (Versioned_rpc.Menu.add
-                  (List.concat_map
-                     ~f:(implementations ?log_not_previously_seen_version)
-                     impls))
+               (List.concat_map
+                  ~f:(implementations ?log_not_previously_seen_version)
+                  impls)
              ~on_exception:Log_on_background_exn
          with
          | Error (`Duplicate_implementations descriptions) ->
@@ -524,7 +523,7 @@ module Connection = struct
 
   let rpc_connection t = t.rpc_connection
   let wait t = t.wait
-  let kill t signal = Process.send_signal t.process signal
+  let process t = t.process
 
   type 'a with_connection_args =
     ?new_fds_for_rpc:bool
@@ -810,6 +809,6 @@ module Connection = struct
 
   module Expert = struct
     let wait = wait
-    let kill = kill
+    let process = process
   end
 end

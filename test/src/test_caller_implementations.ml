@@ -111,7 +111,14 @@ let%expect_test _ =
   [%expect
     {|
     (Error (
-      (rpc_error (Connection_closed ("Rpc message handling loop stopped")))
+      (rpc_error (
+        Connection_closed ((
+          "Rpc message handling loop stopped" (
+            connection_description (
+              "Command_rpc client (parent process)"
+              (prog      <hidden_in_test>)
+              (args      <hidden_in_test>)
+              (child_pid <hidden_in_test>)))))))
       (connection_description (
         "Command_rpc client (parent process)"
         (prog      <hidden_in_test>)
@@ -120,7 +127,14 @@ let%expect_test _ =
       (rpc_name    callee_rpc)
       (rpc_version 1)))
     (Error (
-      (rpc_error (Connection_closed ("Rpc message handling loop stopped")))
+      (rpc_error (
+        Connection_closed ((
+          "Rpc message handling loop stopped" (
+            connection_description (
+              "Command_rpc client (parent process)"
+              (prog      <hidden_in_test>)
+              (args      <hidden_in_test>)
+              (child_pid <hidden_in_test>)))))))
       (connection_description (
         "Command_rpc client (parent process)"
         (prog      <hidden_in_test>)

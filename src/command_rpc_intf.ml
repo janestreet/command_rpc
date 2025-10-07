@@ -235,8 +235,9 @@ module type Command_rpc = sig
         child process. There's nothing particularly tricky about them, but most users
         don't need them. *)
     module Expert : sig
-      (** Send a signal to the command-rpc executable. *)
-      val kill : t -> Signal.t -> unit
+      (** Get the underlying command-rpc worker process. Can be used to send SIGKILL
+          signals for example. *)
+      val process : t -> Process.t
 
       (** Wait for termination of the command-rpc executable and return the exit status.
           This can be used e.g. after [with_close] to collect the missing info, since
