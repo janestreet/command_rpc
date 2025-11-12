@@ -1,6 +1,6 @@
 (executables
  (modes byte exe)
  (names command_rpc_example command_rpc_expert_example)
- (libraries async core command_rpc core_unix.command_unix)
+ (libraries async command_rpc core_unix.command_unix core)
  (preprocess
   (pps ppx_jane)))

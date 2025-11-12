@@ -117,6 +117,8 @@ module type Command_rpc = sig
       :  ?connection_description:Info.t
       -> ?handshake_timeout:Time_float.Span.t
       -> ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
+      -> ?heartbeat_timeout_style:Rpc.Connection.Heartbeat_timeout_style.t
+      -> ?provide_rpc_shapes:bool
       -> ?max_message_size:int
       -> ?log_not_previously_seen_version:(name:string -> int -> unit)
       -> ?buffer_age_limit:Writer.buffer_age_limit
@@ -145,6 +147,8 @@ module type Command_rpc = sig
         -> (?connection_description:Info.t
             -> ?handshake_timeout:Time_float.Span.t
             -> ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
+            -> ?heartbeat_timeout_style:Rpc.Connection.Heartbeat_timeout_style.t
+            -> ?provide_rpc_shapes:bool
             -> ?max_message_size:int
             -> ?log_not_previously_seen_version:(name:string -> int -> unit)
             -> ?buffer_age_limit:Writer.buffer_age_limit
@@ -196,6 +200,8 @@ module type Command_rpc = sig
       -> ?connection_description:Info.t
       -> ?handshake_timeout:Time_float.Span.t
       -> ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
+      -> ?heartbeat_timeout_style:Rpc.Connection.Heartbeat_timeout_style.t
+      -> ?provide_rpc_shapes:bool
       -> ?max_message_size:int
       -> ?buffer_age_limit:Writer.buffer_age_limit
       -> ?implementations:unit Rpc.Implementations.t

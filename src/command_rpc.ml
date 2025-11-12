@@ -266,6 +266,8 @@ module Command = struct
     ?connection_description
     ?(handshake_timeout = default_handshake_timeout ~side:`child)
     ?(heartbeat_config = default_heartbeat_config ~side:`child)
+    ?heartbeat_timeout_style
+    ?provide_rpc_shapes
     ?max_message_size
     ?log_not_previously_seen_version
     ?buffer_age_limit
@@ -313,6 +315,8 @@ module Command = struct
              ~description
              ~handshake_timeout
              ~heartbeat_config
+             ?heartbeat_timeout_style
+             ?provide_rpc_shapes
              ?max_message_size
              ~implementations
              ~connection_state:(fun conn ->
@@ -410,6 +414,8 @@ module Command = struct
         fun ?connection_description
           ?handshake_timeout
           ?heartbeat_config
+          ?heartbeat_timeout_style
+          ?provide_rpc_shapes
           ?max_message_size
           ?log_not_previously_seen_version
           ?buffer_age_limit
@@ -419,6 +425,8 @@ module Command = struct
             ?connection_description
             ?handshake_timeout
             ?heartbeat_config
+            ?heartbeat_timeout_style
+            ?provide_rpc_shapes
             ?max_message_size
             ?log_not_previously_seen_version
             ?buffer_age_limit
@@ -438,6 +446,8 @@ module Command = struct
             ?connection_description
             ?handshake_timeout
             ?heartbeat_config
+            ?heartbeat_timeout_style
+            ?provide_rpc_shapes
             ?max_message_size
             ?log_not_previously_seen_version
             ?buffer_age_limit
@@ -452,6 +462,8 @@ module Command = struct
             ?connection_description
             ?handshake_timeout
             ?heartbeat_config
+            ?heartbeat_timeout_style
+            ?provide_rpc_shapes
             ?max_message_size
             ?log_not_previously_seen_version
             ?buffer_age_limit
@@ -466,6 +478,8 @@ module Command = struct
     ?connection_description
     ?handshake_timeout
     ?heartbeat_config
+    ?heartbeat_timeout_style
+    ?provide_rpc_shapes
     ?max_message_size
     ?log_not_previously_seen_version
     ?buffer_age_limit
@@ -484,6 +498,8 @@ module Command = struct
                ?connection_description
                ?handshake_timeout
                ?heartbeat_config
+               ?heartbeat_timeout_style
+               ?provide_rpc_shapes
                ?max_message_size
                ?log_not_previously_seen_version
                ?buffer_age_limit
@@ -533,6 +549,8 @@ module Connection = struct
     -> ?connection_description:Info.t
     -> ?handshake_timeout:Time_float.Span.t
     -> ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
+    -> ?heartbeat_timeout_style:Rpc.Connection.Heartbeat_timeout_style.t
+    -> ?provide_rpc_shapes:bool
     -> ?max_message_size:int
     -> ?buffer_age_limit:Writer.buffer_age_limit
     -> ?implementations:unit Rpc.Implementations.t
@@ -721,6 +739,8 @@ module Connection = struct
     ?connection_description
     ?(handshake_timeout = default_handshake_timeout ~side:`parent)
     ?(heartbeat_config = default_heartbeat_config ~side:`parent)
+    ?heartbeat_timeout_style
+    ?provide_rpc_shapes
     ?max_message_size
     ?buffer_age_limit
     ?implementations
@@ -751,6 +771,8 @@ module Connection = struct
                (get_connection_description ~connection_description ~prog ~args ~process)
              ~handshake_timeout
              ~heartbeat_config
+             ?heartbeat_timeout_style
+             ?provide_rpc_shapes
              ?max_message_size
              ?implementations
              ~connection_state:(fun _ -> ())
@@ -771,6 +793,8 @@ module Connection = struct
     ?connection_description
     ?(handshake_timeout = default_handshake_timeout ~side:`parent)
     ?(heartbeat_config = default_heartbeat_config ~side:`parent)
+    ?heartbeat_timeout_style
+    ?provide_rpc_shapes
     ?max_message_size
     ?buffer_age_limit
     ?implementations
@@ -800,6 +824,8 @@ module Connection = struct
              (get_connection_description ~connection_description ~prog ~args ~process)
            ~handshake_timeout
            ~heartbeat_config
+           ?heartbeat_timeout_style
+           ?provide_rpc_shapes
            ?max_message_size
            ?implementations
            ~connection_state:(fun _ -> ())
