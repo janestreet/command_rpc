@@ -4,8 +4,8 @@ open Async
 open Command_rpc_intf
 
 module Default_timeouts = struct
-  (* Here we greatly increase the default timeouts that we inherit from Async_rpc.
-     The reason it makes sense to have larger defaults here are:
+  (* Here we greatly increase the default timeouts that we inherit from Async_rpc. The
+     reason it makes sense to have larger defaults here are:
      - it's common to use [Command_rpc] to offload slow computations to the child process,
        so long async cycles in the child are more likely, which makes spurious timeout
        more likely;
@@ -187,8 +187,8 @@ module Command = struct
       Int.( = ) (Core_unix.File_descr.to_int fd1) (Core_unix.File_descr.to_int fd2)
     in
     let equivalent_fd fd1 fd2 =
-      (* this is the same check [Writer] does when sharing the writer between stderr
-         and stdout *)
+      (* this is the same check [Writer] does when sharing the writer between stderr and
+         stdout *)
       let dev_and_ino fd =
         let stats = Core_unix.fstat fd in
         stats.st_dev, stats.st_ino
@@ -225,8 +225,8 @@ module Command = struct
       stdin, stdout
     in
     let make_sure_stdin_and_stdout_are_not_used () =
-      (* After this, anyone attempting to read from stdin gets an empty result
-         and anything written to stdout goes to stderr instead. *)
+      (* After this, anyone attempting to read from stdin gets an empty result and
+         anything written to stdout goes to stderr instead. *)
       let dev_null = Core_unix.openfile ~mode:[ O_RDONLY ] "/dev/null" in
       Async.Fd.expect_file_descr_redirection Core_unix.stdin ~f:(fun () ->
         Core_unix.dup2 ~src:dev_null ~dst:Core_unix.stdin ());
@@ -454,10 +454,10 @@ module Command = struct
             ?on_connection
             rpcs
           ->
-          (* If you want to detect success or failure and do something appropriate,
-                 you can just do that from your RPC implementation. But we still need
-                 [param_exit_status] separately because [create] below doesn't have
-                 access to the RPC implementations. *)
+          (* If you want to detect success or failure and do something appropriate, you
+             can just do that from your RPC implementation. But we still need
+             [param_exit_status] separately because [create] below doesn't have access to
+             the RPC implementations. *)
           main
             ?connection_description
             ?handshake_timeout
@@ -610,9 +610,9 @@ module Connection = struct
       (match stderr_handling with
        | Propagate_stderr | Custom (_ : Reader.t -> unit Deferred.t) -> ()
        | Ignore_stderr ->
-         (* The default for [stderr_handling] (below) is 'Propagate_stderr'.  Because
-            we always propagate stderr here (and stdout), complain if called
-            with anything but 'Propagate_stderr'. *)
+         (* The default for [stderr_handling] (below) is 'Propagate_stderr'. Because we
+            always propagate stderr here (and stdout), complain if called with anything
+            but 'Propagate_stderr'. *)
          raise_s
            [%message
              "Cannot have 'new_fds_for_rpc' and not propagate stderr"
@@ -693,8 +693,8 @@ module Connection = struct
       let stderr_flushed = handle_stderr ~stderr_handling stderr in
       if not wait_for_stderr_transfer
       then
-        (* This is mainly so that when a user closes the connection (which closes stdin and
-           stdout) we will also close stderr. *)
+        (* This is mainly so that when a user closes the connection (which closes stdin
+           and stdout) we will also close stderr. *)
         don't_wait_for
           (Writer.close_finished stdin
            >>= fun () -> Reader.close_finished stdout >>= fun () -> Reader.close stderr);
