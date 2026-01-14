@@ -693,8 +693,8 @@ module Connection = struct
       let stderr_flushed = handle_stderr ~stderr_handling stderr in
       if not wait_for_stderr_transfer
       then
-        (* This is mainly so that when a user closes the connection (which closes stdin and
-           stdout) we will also close stderr. *)
+        (* This is mainly so that when a user closes the connection (which closes stdin
+           and stdout) we will also close stderr. *)
         don't_wait_for
           (Writer.close_finished stdin
            >>= fun () -> Reader.close_finished stdout >>= fun () -> Reader.close stderr);
