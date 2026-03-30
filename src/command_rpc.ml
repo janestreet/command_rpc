@@ -53,6 +53,7 @@ module Command = struct
       [ `Plain of (module T with type state = 'state)
       | `Plain_conv of (module T_conv with type state = 'state)
       | `Pipe of (module T_pipe with type state = 'state)
+      | `Pipe_legacy_leave_open_on_exception of (module T_pipe with type state = 'state)
       | `Pipe_conv of (module T_pipe_conv with type state = 'state)
       | `Implementations of 'state Rpc.Implementation.t list
       ]
@@ -88,6 +89,15 @@ module Command = struct
 
             let implementation state query = implementation (f state) query
           end)
+      | `Pipe_legacy_leave_open_on_exception (module M) ->
+        `Pipe_legacy_leave_open_on_exception
+          (module struct
+            include (M : T_pipe with type state := a)
+
+            type state = b
+
+            let implementation state query = implementation (f state) query
+          end)
       | `Pipe_conv (module M) ->
         `Pipe_conv
           (module struct
@@ -113,6 +123,7 @@ module Command = struct
     [ `Plain of (module T)
     | `Plain_conv of (module T_conv)
     | `Pipe of (module T_pipe)
+    | `Pipe_legacy_leave_open_on_exception of (module T_pipe)
     | `Pipe_conv of (module T_pipe_conv)
     | `Implementations of Invocation.t Rpc.Implementation.t list
     ]
@@ -132,6 +143,9 @@ module Command = struct
              let versions = Set.to_list @@ T.versions () in
              List.map versions ~f:(fun version -> (T.name, version), impl)
            | `Pipe pipe ->
+             let module T = (val pipe : T_pipe) in
+             [ (Rpc.Pipe_rpc.name T.rpc, Rpc.Pipe_rpc.version T.rpc), impl ]
+           | `Pipe_legacy_leave_open_on_exception pipe ->
              let module T = (val pipe : T_pipe) in
              [ (Rpc.Pipe_rpc.name T.rpc, Rpc.Pipe_rpc.version T.rpc), impl ]
            | `Pipe_conv pipe ->
@@ -155,7 +169,8 @@ module Command = struct
     | `Plain_conv (module T) ->
       T.implement_multi ?log_not_previously_seen_version (fun s ~version q ->
         T.implementation s ~version q)
-    | `Pipe (module T) ->
+    | `Pipe (module T) -> [ Rpc.Pipe_rpc.implement T.rpc T.implementation ]
+    | `Pipe_legacy_leave_open_on_exception (module T) ->
       [ Rpc.Pipe_rpc.implement T.rpc T.implementation ~leave_open_on_exception:true ]
     | `Pipe_conv (module T) ->
       T.implement_multi ?log_not_previously_seen_version (fun s ~version q ->
@@ -334,6 +349,19 @@ module Command = struct
             | None ->
               failwithf "unimplemented rpc: (%s, %d)" call.rpc_name call.version ()
             | Some impl ->
+              let implement_pipe (module T : T_pipe) =
+                let query = T.query_of_sexp call.query in
+                T.implementation Sexp query
+                >>= function
+                | Error e ->
+                  write_sexp rpc_write (T.sexp_of_error e);
+                  return `Failure
+                | Ok pipe ->
+                  Pipe.iter pipe ~f:(fun r ->
+                    write_sexp rpc_write (T.sexp_of_response r);
+                    Deferred.unit)
+                  >>| fun () -> `Success
+              in
               (match impl with
                | `Plain (module T) ->
                  let query = T.query_of_sexp call.query in
@@ -347,18 +375,9 @@ module Command = struct
                  >>| fun response ->
                  write_sexp rpc_write (T.sexp_of_response response);
                  `Success
-               | `Pipe (module T) ->
-                 let query = T.query_of_sexp call.query in
-                 T.implementation Sexp query
-                 >>= (function
-                  | Error e ->
-                    write_sexp rpc_write (T.sexp_of_error e);
-                    return `Failure
-                  | Ok pipe ->
-                    Pipe.iter pipe ~f:(fun r ->
-                      write_sexp rpc_write (T.sexp_of_response r);
-                      Deferred.unit)
-                    >>| fun () -> `Success)
+               | `Pipe (module T) -> implement_pipe (module T)
+               | `Pipe_legacy_leave_open_on_exception (module T) ->
+                 implement_pipe (module T)
                | `Pipe_conv (module T) ->
                  let query = T.query_of_sexp call.query in
                  T.implementation Sexp ~version:call.version query
