@@ -85,6 +85,7 @@ module type Command_rpc = sig
         [ `Plain of (module T with type state = 'state)
         | `Plain_conv of (module T_conv with type state = 'state)
         | `Pipe of (module T_pipe with type state = 'state)
+        | `Pipe_legacy_leave_open_on_exception of (module T_pipe with type state = 'state)
         | `Pipe_conv of (module T_pipe_conv with type state = 'state)
         | `Implementations of 'state Rpc.Implementation.t list
         ]
@@ -105,6 +106,7 @@ module type Command_rpc = sig
       [ `Plain of (module T)
       | `Plain_conv of (module T_conv)
       | `Pipe of (module T_pipe)
+      | `Pipe_legacy_leave_open_on_exception of (module T_pipe)
       | `Pipe_conv of (module T_pipe_conv)
       | `Implementations of Invocation.t Rpc.Implementation.t list
       ]
