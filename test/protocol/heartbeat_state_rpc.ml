@@ -106,17 +106,28 @@ end
 
 let server ~min_version ~max_version =
   let module X = Make () in
-  let () =
-    assert (Int.( > ) max_version min_version);
-    assert (Int.( > ) min_version 0);
-    for version = min_version to max_version do
-      ignore
-        (register_version (module X.Register) version
-         : (X.query, X.initial_state, X.update, X.error) Rpc.State_rpc.t)
-    done
-  in
-  X.implement_multi (fun _invocation ~version:_ n ->
-    return (Ok ((), Pipe.of_list (List.init n ~f:(const ())))))
+  assert (Int.( > ) max_version min_version);
+  assert (Int.( > ) min_version 0);
+  for version = min_version to max_version do
+    ignore
+      (register_version (module X.Register) version
+       : (X.query, X.initial_state, X.update, X.error) Rpc.State_rpc.t)
+  done;
+  (module struct
+    type query = int [@@deriving of_sexp]
+    type initial_state = unit [@@deriving sexp_of]
+    type update = unit [@@deriving sexp_of]
+    type error = Error.t [@@deriving sexp_of]
+
+    let implement_multi = X.implement_multi
+    let rpcs = X.rpcs
+    let versions = X.versions
+    let name = X.name
+
+    let implementation _invocation ~version:_ n =
+      return (Ok ((), Pipe.of_list (List.init n ~f:(const ()))))
+    ;;
+  end : S)
 ;;
 
 let client ~version =

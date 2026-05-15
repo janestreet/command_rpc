@@ -48,6 +48,8 @@ module Command = struct
     module type T_conv = T_conv
     module type T_pipe = T_pipe
     module type T_pipe_conv = T_pipe_conv
+    module type T_state = T_state
+    module type T_state_conv = T_state_conv
 
     type 'state t =
       [ `Plain of (module T with type state = 'state)
@@ -55,6 +57,8 @@ module Command = struct
       | `Pipe of (module T_pipe with type state = 'state)
       | `Pipe_legacy_leave_open_on_exception of (module T_pipe with type state = 'state)
       | `Pipe_conv of (module T_pipe_conv with type state = 'state)
+      | `State of (module T_state with type state = 'state)
+      | `State_conv of (module T_state_conv with type state = 'state)
       | `Implementations of 'state Rpc.Implementation.t list
       ]
 
@@ -109,6 +113,26 @@ module Command = struct
               implementation (f state) ~version query
             ;;
           end)
+      | `State (module M) ->
+        `State
+          (module struct
+            include (M : T_state with type state := a)
+
+            type state = b
+
+            let implementation state query = implementation (f state) query
+          end)
+      | `State_conv (module M) ->
+        `State_conv
+          (module struct
+            include (M : T_state_conv with type state := a)
+
+            type state = b
+
+            let implementation state ~version query =
+              implementation (f state) ~version query
+            ;;
+          end)
       | `Implementations impls ->
         `Implementations (List.map impls ~f:(Rpc.Implementation.lift ~f))
     ;;
@@ -118,6 +142,8 @@ module Command = struct
   module type T_conv = Stateful.T_conv with type state := Invocation.t
   module type T_pipe = Stateful.T_pipe with type state := Invocation.t
   module type T_pipe_conv = Stateful.T_pipe_conv with type state := Invocation.t
+  module type T_state = Stateful.T_state with type state := Invocation.t
+  module type T_state_conv = Stateful.T_state_conv with type state := Invocation.t
 
   type t =
     [ `Plain of (module T)
@@ -125,6 +151,8 @@ module Command = struct
     | `Pipe of (module T_pipe)
     | `Pipe_legacy_leave_open_on_exception of (module T_pipe)
     | `Pipe_conv of (module T_pipe_conv)
+    | `State of (module T_state)
+    | `State_conv of (module T_state_conv)
     | `Implementations of Invocation.t Rpc.Implementation.t list
     ]
 
@@ -152,6 +180,13 @@ module Command = struct
              let module T = (val pipe : T_pipe_conv) in
              let versions = Set.to_list @@ T.versions () in
              List.map versions ~f:(fun version -> (T.name, version), impl)
+           | `State state ->
+             let module T = (val state : T_state) in
+             [ (Rpc.State_rpc.name T.rpc, Rpc.State_rpc.version T.rpc), impl ]
+           | `State_conv state ->
+             let module T = (val state : T_state_conv) in
+             let versions = Set.to_list @@ T.versions () in
+             List.map versions ~f:(fun version -> (T.name, version), impl)
            | `Implementations impls ->
              List.map impls ~f:(fun impl ->
                let desc = Rpc.Implementation.description impl in
@@ -173,6 +208,10 @@ module Command = struct
     | `Pipe_legacy_leave_open_on_exception (module T) ->
       [ Rpc.Pipe_rpc.implement T.rpc T.implementation ~leave_open_on_exception:true ]
     | `Pipe_conv (module T) ->
+      T.implement_multi ?log_not_previously_seen_version (fun s ~version q ->
+        T.implementation s ~version q)
+    | `State (module T) -> [ Rpc.State_rpc.implement T.rpc T.implementation ]
+    | `State_conv (module T) ->
       T.implement_multi ?log_not_previously_seen_version (fun s ~version q ->
         T.implementation s ~version q)
     | `Implementations impls -> impls
@@ -268,13 +307,13 @@ module Command = struct
   ;;
 
   let default_connection_description =
-    Info.of_lazy_sexp
-      (lazy
-        [%message
-          "Command_rpc server (child process)"
-            ~executable:(Sys.executable_name : string Sexp_hidden_in_test.t)
-            ~pid:(Unix.getpid () : Pid.t Sexp_hidden_in_test.t)
-            ~parent_pid:(Unix.getppid () : Pid.t option Sexp_hidden_in_test.t)])
+    Info.Portable.of_portable_lazy_sexp
+      (Portable_lazy.from_fun (fun () ->
+         [%message
+           "Command_rpc server (child process)"
+             ~executable:(Sys.executable_name : string Sexp_hidden_in_test.t)
+             ~pid:(Unix.getpid () : Pid.t Sexp_hidden_in_test.t)
+             ~parent_pid:(Unix.getppid () : Pid.t option Sexp_hidden_in_test.t)]))
   ;;
 
   let main
@@ -349,16 +388,31 @@ module Command = struct
             | None ->
               failwithf "unimplemented rpc: (%s, %d)" call.rpc_name call.version ()
             | Some impl ->
-              let implement_pipe (module T : T_pipe) =
-                let query = T.query_of_sexp call.query in
-                T.implementation Sexp query
-                >>= function
+              let handle_state
+                ~sexp_of_error
+                ~sexp_of_initial_state
+                ~sexp_of_update
+                result
+                =
+                match result with
                 | Error e ->
-                  write_sexp rpc_write (T.sexp_of_error e);
+                  write_sexp rpc_write (sexp_of_error e);
+                  return `Failure
+                | Ok (initial_state, pipe) ->
+                  write_sexp rpc_write (sexp_of_initial_state initial_state);
+                  Pipe.iter pipe ~f:(fun update ->
+                    write_sexp rpc_write (sexp_of_update update);
+                    Deferred.unit)
+                  >>| fun () -> `Success
+              in
+              let handle_pipe ~sexp_of_error ~sexp_of_response res =
+                match res with
+                | Error e ->
+                  write_sexp rpc_write (sexp_of_error e);
                   return `Failure
                 | Ok pipe ->
-                  Pipe.iter pipe ~f:(fun r ->
-                    write_sexp rpc_write (T.sexp_of_response r);
+                  Pipe.iter pipe ~f:(fun update ->
+                    write_sexp rpc_write (sexp_of_response update);
                     Deferred.unit)
                   >>| fun () -> `Success
               in
@@ -375,21 +429,31 @@ module Command = struct
                  >>| fun response ->
                  write_sexp rpc_write (T.sexp_of_response response);
                  `Success
-               | `Pipe (module T) -> implement_pipe (module T)
+               | `Pipe (module T) ->
+                 let open T in
+                 let query = query_of_sexp call.query in
+                 T.implementation Sexp query
+                 >>= handle_pipe ~sexp_of_error ~sexp_of_response
                | `Pipe_legacy_leave_open_on_exception (module T) ->
-                 implement_pipe (module T)
+                 let open T in
+                 let query = query_of_sexp call.query in
+                 T.implementation Sexp query
+                 >>= handle_pipe ~sexp_of_error ~sexp_of_response
                | `Pipe_conv (module T) ->
-                 let query = T.query_of_sexp call.query in
+                 let open T in
+                 let query = query_of_sexp call.query in
                  T.implementation Sexp ~version:call.version query
-                 >>= (function
-                  | Error e ->
-                    write_sexp rpc_write (T.sexp_of_error e);
-                    return `Failure
-                  | Ok pipe ->
-                    Pipe.iter pipe ~f:(fun r ->
-                      write_sexp rpc_write (T.sexp_of_response r);
-                      Deferred.unit)
-                    >>| fun () -> `Success)
+                 >>= handle_pipe ~sexp_of_error ~sexp_of_response
+               | `State (module T) ->
+                 let open T in
+                 let query = query_of_sexp call.query in
+                 T.implementation Sexp query
+                 >>= handle_state ~sexp_of_initial_state ~sexp_of_error ~sexp_of_update
+               | `State_conv (module T) ->
+                 let open T in
+                 let query = query_of_sexp call.query in
+                 T.implementation Sexp ~version:call.version query
+                 >>= handle_state ~sexp_of_initial_state ~sexp_of_error ~sexp_of_update
                | `Implementations _ ->
                  failwithf
                    "This RPC is not supported in [-sexp] mode: (%s, %d)"
@@ -565,7 +629,7 @@ module Connection = struct
     -> ?stdout_handling:Stdout_handling.t
     -> ?stderr_handling:Stderr_handling.t
     -> ?wait_for_stderr_transfer:bool
-    -> ?connection_description:Info.t
+    -> ?connection_description:Info.Portable.t
     -> ?handshake_timeout:Time_float.Span.t
     -> ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
     -> ?heartbeat_timeout_style:Rpc.Connection.Heartbeat_timeout_style.t
@@ -735,13 +799,13 @@ module Connection = struct
 
   let default_connection_description ~prog ~args ~process =
     let child_pid = Process.pid process in
-    Info.of_lazy_sexp
-      (lazy
-        [%message
-          "Command_rpc client (parent process)"
-            (prog : string Sexp_hidden_in_test.t)
-            (args : string list Sexp_hidden_in_test.t)
-            (child_pid : Pid.t Sexp_hidden_in_test.t)])
+    Info.Portable.of_portable_lazy_sexp
+      (Portable_lazy.from_fun (fun () ->
+         [%message
+           "Command_rpc client (parent process)"
+             (prog : string Sexp_hidden_in_test.t)
+             (args : string list Sexp_hidden_in_test.t)
+             (child_pid : Pid.t Sexp_hidden_in_test.t)]))
   ;;
 
   let get_connection_description ~connection_description ~prog ~args ~process =
