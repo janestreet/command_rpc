@@ -125,7 +125,7 @@ module Spawn_sleep_1000_and_print_its_pid_to_fd_7 = struct
   ;;
 
   let implementation (_ : Command_rpc.Command.Invocation.t) () =
-    Process.run_expect_no_output_exn
+    Process.run_expect_no_stdout_exn
       ~prog:"bash"
       ~args:
         [ "-euo"; "pipefail"; "-c"; "sleep 1000 >/dev/null 2>/dev/null & echo $! >&7" ]

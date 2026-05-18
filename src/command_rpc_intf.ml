@@ -56,6 +56,42 @@ module type T_pipe_conv = sig
     -> (response Pipe.Reader.t, error) Result.t Deferred.t
 end
 
+module type T_state = sig
+  type query [@@deriving of_sexp]
+  type initial_state [@@deriving sexp_of]
+  type update [@@deriving sexp_of]
+  type error [@@deriving sexp_of]
+  type state
+
+  val rpc : (query, initial_state, update, error) Rpc.State_rpc.t
+
+  val implementation
+    :  state
+    -> query
+    -> (initial_state * update Pipe.Reader.t, error) Result.t Deferred.t
+end
+
+module type T_state_conv = sig
+  type query [@@deriving of_sexp]
+  type initial_state [@@deriving sexp_of]
+  type update [@@deriving sexp_of]
+  type error [@@deriving sexp_of]
+  type state
+
+  include
+    Versioned_rpc.Callee_converts.State_rpc.S
+    with type query := query
+    with type state := initial_state
+    with type update := update
+    with type error := error
+
+  val implementation
+    :  state
+    -> version:int
+    -> query
+    -> (initial_state * update Pipe.Reader.t, error) Result.t Deferred.t
+end
+
 module type Command_rpc = sig
   (** [Command] is used for setting up an RPC server in the child process communicating
       with the parent over stdin&stdout. By default this will use an Async RPC protocol,
@@ -80,6 +116,8 @@ module type Command_rpc = sig
       module type T_conv = T_conv
       module type T_pipe = T_pipe
       module type T_pipe_conv = T_pipe_conv
+      module type T_state = T_state
+      module type T_state_conv = T_state_conv
 
       type 'state t =
         [ `Plain of (module T with type state = 'state)
@@ -87,6 +125,8 @@ module type Command_rpc = sig
         | `Pipe of (module T_pipe with type state = 'state)
         | `Pipe_legacy_leave_open_on_exception of (module T_pipe with type state = 'state)
         | `Pipe_conv of (module T_pipe_conv with type state = 'state)
+        | `State of (module T_state with type state = 'state)
+        | `State_conv of (module T_state_conv with type state = 'state)
         | `Implementations of 'state Rpc.Implementation.t list
         ]
 
@@ -101,6 +141,8 @@ module type Command_rpc = sig
     module type T_conv = Stateful.T_conv with type state := Invocation.t
     module type T_pipe = Stateful.T_pipe with type state := Invocation.t
     module type T_pipe_conv = Stateful.T_pipe_conv with type state := Invocation.t
+    module type T_state = Stateful.T_state with type state := Invocation.t
+    module type T_state_conv = Stateful.T_state_conv with type state := Invocation.t
 
     type t =
       [ `Plain of (module T)
@@ -108,6 +150,8 @@ module type Command_rpc = sig
       | `Pipe of (module T_pipe)
       | `Pipe_legacy_leave_open_on_exception of (module T_pipe)
       | `Pipe_conv of (module T_pipe_conv)
+      | `State of (module T_state)
+      | `State_conv of (module T_state_conv)
       | `Implementations of Invocation.t Rpc.Implementation.t list
       ]
 
@@ -116,7 +160,7 @@ module type Command_rpc = sig
     val stateful : Invocation.t Stateful.t list -> t list
 
     val create
-      :  ?connection_description:Info.t
+      :  ?connection_description:Info.Portable.t
       -> ?handshake_timeout:Time_float.Span.t
       -> ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
       -> ?heartbeat_timeout_style:Rpc.Connection.Heartbeat_timeout_style.t
@@ -146,7 +190,7 @@ module type Command_rpc = sig
           calling [Command.async_or_error']. *)
       val param
         :  unit
-        -> (?connection_description:Info.t
+        -> (?connection_description:Info.Portable.t
             -> ?handshake_timeout:Time_float.Span.t
             -> ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
             -> ?heartbeat_timeout_style:Rpc.Connection.Heartbeat_timeout_style.t
@@ -199,7 +243,7 @@ module type Command_rpc = sig
            (** Defaults to [true]. If set to true, makes [with_close] and [Expert.wait]
                wait for stderr to have been fully propagated, fully drained, or for the
                user callback (in the case of [stderr_handling = Custom _]) to complete. *)
-      -> ?connection_description:Info.t
+      -> ?connection_description:Info.Portable.t
       -> ?handshake_timeout:Time_float.Span.t
       -> ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
       -> ?heartbeat_timeout_style:Rpc.Connection.Heartbeat_timeout_style.t
