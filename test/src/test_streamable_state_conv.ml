@@ -17,7 +17,7 @@ let test new_fds_for_rpc (versions : Versions.t) =
       Command_rpc_test_protocol.Heartbeat_streamable_state_rpc.client
         ~version:versions.client
     in
-    let%bind.Deferred.Or_error (), updates =
+    let%bind.Deferred.Or_error (), updates, (_ : Rpc.State_rpc.Metadata.t) =
       Streamable.State_rpc.dispatch rpc (Command_rpc.Connection.rpc_connection conn) n
     in
     let%map updates = Pipe.to_list updates in
